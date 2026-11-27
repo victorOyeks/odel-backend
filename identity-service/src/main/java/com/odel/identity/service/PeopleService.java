@@ -186,7 +186,7 @@ public class PeopleService {
         }
         List<Resolved> rs = resolveRoles(in.roles(), f, t.name());
         if (!f.isEmpty()) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "Some details need fixing.", f);
-        if (users.findAll().stream().anyMatch(u -> u.getEmail().equalsIgnoreCase(email))) {
+        if (users.findAll().stream().anyMatch(u -> email.equalsIgnoreCase(u.getEmail()))) { // student accounts may have no email
             throw new ApiException(HttpStatus.CONFLICT, "email_taken", email + " already has an account here.");
         }
         User u = create(in.fullName().trim(), email, rs, actor);
@@ -259,7 +259,7 @@ public class PeopleService {
         List<Csv.Row> rows = Csv.dataRows(parsed);
         if (rows.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "empty_file", "The file has no rows under the header.");
         TenantLook t = tenants.current();
-        Set<String> existing = users.findAll().stream().map(u -> u.getEmail().toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        Set<String> existing = emailsInUse();
         Map<String, Integer> inFile = new HashMap<>();
         List<PendingInvite> ready = new ArrayList<>();
         List<Problem> problems = new ArrayList<>();
@@ -309,8 +309,9 @@ public class PeopleService {
         AuditService.Actor actor = actor(cu);
         TenantLook t = tenants.current();
         int invited = 0;
+        Set<String> inUse = emailsInUse();
         for (PendingInvite p : pending.ready()) {
-            if (users.findAll().stream().anyMatch(u -> u.getEmail().equalsIgnoreCase(p.email()))) continue;
+            if (inUse.contains(p.email().toLowerCase(Locale.ROOT))) continue;
             Map<String, String> f = new HashMap<>();
             List<Resolved> rs = resolveRoles(p.roles(), f, t.name());
             if (!f.isEmpty() || rs.isEmpty()) continue;
@@ -318,6 +319,15 @@ public class PeopleService {
             invited++;
         }
         return checkView(pending, "IMPORTED", invited);
+    }
+
+    /** Every email already on an account here, lower case. Student accounts imported without an email have none. */
+    private Set<String> emailsInUse() {
+        return emailsOf(users.findAll());
+    }
+
+    static Set<String> emailsOf(List<User> all) {
+        return all.stream().map(User::getEmail).filter(Objects::nonNull).map(e -> e.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
     }
 
     private static ImportCheck checkView(PendingImport p, String status, Integer invited) {
