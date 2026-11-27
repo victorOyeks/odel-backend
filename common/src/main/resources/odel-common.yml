@@ -63,6 +63,8 @@ odel:
     identity: ${ODEL_IDENTITY_URL:http://127.0.0.1:9301}
     tenant: ${ODEL_TENANT_URL:http://127.0.0.1:9302}
     notification: ${ODEL_NOTIFICATION_URL:http://127.0.0.1:9303}
+    academic: ${ODEL_ACADEMIC_URL:http://127.0.0.1:9304}
+    students: ${ODEL_STUDENTS_URL:http://127.0.0.1:9305}
   # Hosts: <slug>.<base-domain> and console.<base-domain>; a university's own web address also works.
   base-domain: ${ODEL_BASE_DOMAIN:localhost}
   web-scheme: ${ODEL_WEB_SCHEME:http}
