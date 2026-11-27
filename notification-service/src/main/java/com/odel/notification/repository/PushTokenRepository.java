@@ -1,5 +1,7 @@
 package com.odel.notification.repository;
 
+import org.springframework.data.jpa.repository.Query;
+
 import com.odel.notification.entity.PushToken;
 
 import com.odel.common.*;
@@ -16,6 +18,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface PushTokenRepository extends JpaRepository<PushToken, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Query("select x from PushToken x where x.id = ?1")
+    Optional<PushToken> findInTenant(UUID id);
+
     List<PushToken> findByUserId(UUID userId);
     Optional<PushToken> findByToken(String token);
 }

@@ -77,7 +77,7 @@ public class SessionController {
         if (data.stage != SessionData.Stage.CHOOSE_ROLE && data.stage != SessionData.Stage.SIGNED_IN) {
             throw new ApiException(HttpStatus.CONFLICT, "wrong_stage", "Finish two-step sign-in first.");
         }
-        RoleAssignment role = body.roleAssignmentId() == null ? null : roles.findById(body.roleAssignmentId())
+        RoleAssignment role = body.roleAssignmentId() == null ? null : roles.findInTenant(body.roleAssignmentId())
                 .filter(r -> r.getUserId().equals(u.userId())).orElse(null);
         if (role == null) throw ApiException.notFound();
         UUID previous = data.activeRoleId;

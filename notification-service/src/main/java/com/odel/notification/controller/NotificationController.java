@@ -60,7 +60,7 @@ public class NotificationController {
     @PostMapping("/notifications/{id}/read")
     @Transactional
     public ResponseEntity<Void> read(CurrentUserArg.Holder cu, @PathVariable UUID id) {
-        Notification n = notifications.findById(id).filter(x -> x.getUserId().equals(cu.user().userId()))
+        Notification n = notifications.findInTenant(id).filter(x -> x.getUserId().equals(cu.user().userId()))
                 .orElseThrow(ApiException::notFound);
         if (n.getReadAt() == null) n.setReadAt(clock.instant());
         return ResponseEntity.noContent().build();

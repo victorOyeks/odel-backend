@@ -1,5 +1,7 @@
 package com.odel.identity.repository;
 
+import org.springframework.data.jpa.repository.Query;
+
 import com.odel.identity.entity.TrustedDevice;
 
 import com.odel.common.*;
@@ -14,5 +16,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TrustedDeviceRepository extends JpaRepository<TrustedDevice, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Query("select x from TrustedDevice x where x.id = ?1")
+    Optional<TrustedDevice> findInTenant(UUID id);
+
     Optional<TrustedDevice> findByTokenHash(String tokenHash);
 }

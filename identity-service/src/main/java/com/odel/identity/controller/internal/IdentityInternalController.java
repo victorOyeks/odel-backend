@@ -71,13 +71,13 @@ public class IdentityInternalController {
     public StaffView firstAdmin() {
         return roles.findAll().stream().filter(r -> r.getRole() == Role.ODEL_ADMIN)
                 .min(Comparator.comparing(RoleAssignment::getCreatedAt))
-                .flatMap(r -> users.findById(r.getUserId())).map(StaffView::of)
+                .flatMap(r -> users.findInTenant(r.getUserId())).map(StaffView::of)
                 .orElseThrow(ApiException::notFound);
     }
 
     @GetMapping("/users/{id}")
     @Transactional(readOnly = true)
     public StaffView user(@PathVariable UUID id) {
-        return users.findById(id).map(StaffView::of).orElseThrow(ApiException::notFound);
+        return users.findInTenant(id).map(StaffView::of).orElseThrow(ApiException::notFound);
     }
 }

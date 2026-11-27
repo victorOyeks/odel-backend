@@ -1,5 +1,7 @@
 package com.odel.identity.repository;
 
+import java.util.Optional;
+
 import com.odel.identity.entity.MfaBackupCode;
 
 import com.odel.common.*;
@@ -16,6 +18,10 @@ import java.util.List;
 import java.util.UUID;
 
 public interface MfaBackupCodeRepository extends JpaRepository<MfaBackupCode, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Query("select x from MfaBackupCode x where x.id = ?1")
+    Optional<MfaBackupCode> findInTenant(UUID id);
+
     List<MfaBackupCode> findByUserIdAndUsedAtIsNull(UUID userId);
 
     @Modifying

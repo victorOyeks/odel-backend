@@ -16,6 +16,10 @@ import java.util.UUID;
 
 /** Tenant-scoped: every query only sees the current university's users. */
 public interface UserRepository extends JpaRepository<User, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Query("select x from User x where x.id = ?1")
+    Optional<User> findInTenant(UUID id);
+
     @Query("select u from User u where lower(u.email) = lower(?1)")
     Optional<User> findByEmail(String email);
 

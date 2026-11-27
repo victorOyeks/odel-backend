@@ -187,7 +187,7 @@ public class SignInService {
             return signIn + "?error=expired";
         }
         return tx.execute(status -> {
-            User user = users.findById(h.get().userId()).orElse(null);
+            User user = users.findInTenant(h.get().userId()).orElse(null);
             if (user == null) return signIn + "?error=not_linked";
             SessionData data = new SessionData();
             data.userId = user.getId();

@@ -1,5 +1,7 @@
 package com.odel.notification.repository;
 
+import java.util.Optional;
+
 import com.odel.notification.entity.Notification;
 
 import com.odel.common.*;
@@ -19,6 +21,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Query("select x from Notification x where x.id = ?1")
+    Optional<Notification> findInTenant(UUID id);
+
     Page<Notification> findByUserIdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
     long countByUserIdAndReadAtIsNull(UUID userId);
 
