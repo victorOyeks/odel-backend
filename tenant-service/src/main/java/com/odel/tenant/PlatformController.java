@@ -67,7 +67,11 @@ public class PlatformController {
 
     public record BrandingView(String primaryColor, String accentColor, String logoUrl, boolean readabilityPassed) {}
 
+    /** The university's own domain and what is left to do for it. pointTo = what its DNS record must point at. */
+    public record CustomDomain(String address, String status, String recordType, String pointTo) {}
+
     public record TenantDetail(UUID id, String name, String shortName, String slug, String webAddress, String portalUrl,
+                               String platformUrl, CustomDomain customDomain,
                                String googleDomain, String status, Instant createdAt, Map<String, String> createdBy,
                                BrandingView branding, AdminView firstAdmin, List<NextStep> nextSteps) {}
 
@@ -176,15 +180,23 @@ public class PlatformController {
         String createdBy = t.getCreatedByName();
         var b = branding.branding(t);
         boolean readable = Contrast.ratio(t.getPrimaryColor(), "#FFFFFF") >= Contrast.MIN;
-        String address = t.getWebAddress() != null ? t.getWebAddress() : t.getSlug() + " address";
-        List<NextStep> steps = List.of(
-                new NextStep("Tenant created with its own data store", true),
-                new NextStep("Branding applied to web, emails and slips", readable),
-                new NextStep(admin == null ? "Invitation not sent" : "Invitation emailed to " + admin.fullName(), admin != null),
-                new NextStep(t.getWebAddress() == null ? "Using the platform address " + t.getSlug() + "." + "<base domain>" : "Waiting: DNS record for " + address, false),
-                new NextStep("Waiting: " + (admin == null ? "the first admin" : admin.fullName()) + " completes the setup checklist", false));
+        String platform = setup.platformUrl(t);
+        CustomDomain custom = t.getWebAddress() == null ? null
+                : new CustomDomain(t.getWebAddress(), t.getWebAddressStatus().name(), "CNAME", platform.replaceFirst("^https?://", "").replaceFirst(":\\d+$", ""));
+        List<NextStep> steps = new java.util.ArrayList<>();
+        steps.add(new NextStep("University created with its own data, kept apart from every other university", true));
+        steps.add(new NextStep("Live at " + platform, true));
+        if (custom != null) {
+            steps.add(t.getWebAddressStatus() == Tenant.WebAddressStatus.LIVE
+                    ? new NextStep("Own domain live: " + t.getWebAddress(), true)
+                    : new NextStep("Waiting for the university's IT team: a CNAME record for " + t.getWebAddress() + " pointing to " + custom.pointTo(), false));
+        }
+        steps.add(admin == null ? new NextStep("First admin not invited yet", false)
+                : admin.accepted() ? new NextStep(admin.fullName() + " accepted the invitation and signed in", true)
+                : new NextStep("Invitation emailed to " + admin.fullName() + "; waiting for the first sign-in", false));
+        steps.add(new NextStep("Waiting: " + (admin == null ? "the first admin" : admin.fullName()) + " completes the setup checklist", false));
         return new TenantDetail(t.getId(), t.getName(), t.getShortName(), t.getSlug(), t.getWebAddress(), setup.portalUrl(t),
-                t.getGoogleDomain(), t.getStatus().name(), t.getCreatedAt(), createdBy == null ? null : Map.of("fullName", createdBy),
+                platform, custom, t.getGoogleDomain(), t.getStatus().name(), t.getCreatedAt(), createdBy == null ? null : Map.of("fullName", createdBy),
                 new BrandingView(t.getPrimaryColor(), t.getAccentColor(), b.logoUrl(), readable), admin, steps);
     }
 

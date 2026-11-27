@@ -102,6 +102,7 @@ public class TenantSetupService {
         t.setName(in.name().trim());
         t.setShortName(in.shortName().trim());
         t.setWebAddress(web);
+        t.setWebAddressStatus(web == null ? Tenant.WebAddressStatus.NONE : Tenant.WebAddressStatus.WAITING_DNS);
         t.setGoogleDomain(in.googleDomain().trim().toLowerCase(Locale.ROOT));
         t.setStatus(Tenant.Status.SETTING_UP);
         t.setPrimaryColor(primary);
@@ -203,9 +204,18 @@ public class TenantSetupService {
         }
     }
 
+    /** Where people should go: the university's own domain once it is live, otherwise its platform address. */
     public String portalUrl(Tenant t) {
-        String host = t.getWebAddress() != null ? t.getWebAddress() : t.getSlug() + "." + props.baseDomain();
-        if ("localhost".equals(props.baseDomain()) && t.getWebAddress() == null) host = host + ":3000";
+        if (t.getWebAddress() != null && t.getWebAddressStatus() == Tenant.WebAddressStatus.LIVE) {
+            return props.webScheme() + "://" + t.getWebAddress();
+        }
+        return platformUrl(t);
+    }
+
+    /** <slug>.<base domain>: works as soon as the university exists (wildcard DNS and certificate). */
+    public String platformUrl(Tenant t) {
+        String host = t.getSlug() + "." + props.baseDomain();
+        if ("localhost".equals(props.baseDomain())) host = host + ":3000";
         return props.webScheme() + "://" + host;
     }
 

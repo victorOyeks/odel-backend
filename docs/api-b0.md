@@ -168,6 +168,10 @@ Rules and payments (SA-04) are not in B0: universities get the default rules, se
 ### `PATCH /platform/tenants/{id}` (SA-01b Edit)
 Any of `{"name","shortName","branding":{"primaryColor","accentColor","logoKey"}}`; omitted fields stay. `logoKey: ""` removes the logo. Same `400`/`422 contrast` errors as create; returns the tenant detail. Audited as `TENANT_UPDATED` with old and new values.
 
+Tenant detail also carries `platformUrl` (always live: `https://<slug>.<base domain>`) and, when the university gave its own domain,
+`customDomain: {"address","status":"WAITING_DNS|LIVE","recordType":"CNAME","pointTo":"<slug>.<base domain>"}`. `portalUrl` (used in
+emails) is the own domain once LIVE, else the platform address. `nextSteps` lists only facts the system knows.
+
 ### `POST /platform/tenants/{id}/resend-invitation` → `204`.
 
 ### `GET /platform/audit?tenantId=&page=` (SA-09)
