@@ -1,6 +1,8 @@
 server:
   port: ${GATEWAY_PORT:9300}
-  forward-headers-strategy: framework
+  # Not "framework": its X-Forwarded-For parsing answers 400 to a bare IPv6 client address (e.g. ::1).
+  # The gateway needs no forwarded data itself; the access log reads X-Forwarded-For directly.
+  forward-headers-strategy: none
 
 spring:
   application:
