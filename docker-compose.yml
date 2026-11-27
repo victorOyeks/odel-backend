@@ -1,0 +1,17 @@
+# Local development services. Ports are offset so they do not clash with other projects on this machine.
+# Email and file storage need no container in development: the dev profile logs emails
+# (GET /api/v1/dev/emails) and keeps files on local disk with the same signed links R2 gives.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: odel
+      POSTGRES_USER: odel
+      POSTGRES_PASSWORD: odel
+    ports: ["5440:5432"]
+    volumes: [odel-pg:/var/lib/postgresql/data]
+  redis:
+    image: redis:7-alpine
+    ports: ["6390:6379"]
+volumes:
+  odel-pg:
