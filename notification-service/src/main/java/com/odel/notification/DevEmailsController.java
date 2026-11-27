@@ -8,9 +8,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-/** Development only (mail mode "log"): the last 20 emails the platform sent or would have sent. */
+/** Development only (the dev sign-in stand-in is on): the last 20 emails, sent, skipped or logged. */
 @RestController
-@ConditionalOnProperty(name = "odel.mail.mode", havingValue = "log")
+@ConditionalOnProperty(name = "odel.google.dev-stub", havingValue = "true")
 public class DevEmailsController {
     private final JdbcTemplate jdbc;
 
@@ -21,7 +21,7 @@ public class DevEmailsController {
     @GetMapping("/api/v1/dev/emails")
     public List<Map<String, Object>> emails() {
         return jdbc.queryForList("""
-                select created_at, tenant_id, to_address, subject, status, body
+                select created_at, tenant_id, to_address, subject, status, last_error, body
                 from outbound_messages where channel = 'EMAIL' order by created_at desc limit 20""");
     }
 }

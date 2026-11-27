@@ -8,4 +8,5 @@
     <!-- One plain SQL file per change, never edited after it ships: add a new file instead. -->
     <include file="db/changelog/common/000-app.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/001-notification.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/002-skipped-status.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

@@ -40,7 +40,12 @@ public class EmailJob implements JobHandler {
         Row row = jdbc.queryForObject("select to_address, from_name, subject, body, html_body, status from outbound_messages where id = ? and tenant_id = ?",
                 (rs, i) -> new Row(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6)),
                 id, TenantContext.require());
-        if (row == null || "SENT".equals(row.status())) return; // already sent: safe to run twice
+        if (row == null || "SENT".equals(row.status()) || "SKIPPED".equals(row.status())) return; // safe to run twice
+        if (TestAddresses.isTest(row.to())) {
+            // A reserved test domain (.test, .example, example.com...) can never receive mail: recorded, never sent.
+            jdbc.update("update outbound_messages set status = 'SKIPPED', last_error = 'Not sent: test address' where id = ?", id);
+            return;
+        }
         String fromName = row.fromName();
         try {
             sender.send(row.to(), fromName, row.subject(), row.body(), row.html());

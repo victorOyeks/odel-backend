@@ -90,6 +90,8 @@ odel:
     secret-key: ${ODEL_STORAGE_SECRET_KEY:odel-secret}
   mail:
     mode: ${ODEL_MAIL_MODE:smtp}       # smtp | log (development only)
+    # Brevo's transactional API; when set, email goes through it instead of SMTP (as in hospio-backend).
+    brevo-api-key: ${ODEL_BREVO_API_KEY:}
     from-address: ${ODEL_MAIL_FROM:no-reply@odel.dev}
     from-name: ${ODEL_MAIL_FROM_NAME:ODeL Platform}
   push:

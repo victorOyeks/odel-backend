@@ -40,7 +40,7 @@ public record OdelProperties(
 
     public record Storage(String mode, String localDir, String endpoint, String region, String bucket, String accessKey, String secretKey) {}
 
-    public record Mail(String mode, String fromAddress, String fromName) {}
+    public record Mail(String mode, String brevoApiKey, String fromAddress, String fromName) {}
 
     public record Push(String fcmProjectId, String fcmServiceAccountFile) {}
 
