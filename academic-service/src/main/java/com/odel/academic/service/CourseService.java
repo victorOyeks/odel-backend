@@ -104,6 +104,7 @@ public class CourseService {
 
     @Transactional
     public CourseView save(UUID id, CourseIn in, AuditService.Actor actor) {
+        if (id != null) courses.findById(id).orElseThrow(ApiException::notFound); // another university's id: 404 before any checks
         Map<String, String> f = check(in.code(), in.title(), in.units(), in.level(), in.semester());
         List<OfferIn> offered = in.offeredTo() == null ? List.of() : in.offeredTo();
         Set<UUID> seen = new HashSet<>();

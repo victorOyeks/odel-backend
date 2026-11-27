@@ -86,6 +86,7 @@ public class CentreService {
 
     @Transactional
     public CentreView save(UUID id, CentreIn in, AuditService.Actor actor) {
+        if (id != null) centres.findById(id).orElseThrow(ApiException::notFound); // another university's id: 404 before any checks
         StructureService.fail(checkCentre(in));
         String code = Codes.unit(in.code()), name = in.name().trim();
         centres.findByCode(code).filter(x -> !x.getId().equals(id)).ifPresent(x -> StructureService.taken(code, x.getName()));

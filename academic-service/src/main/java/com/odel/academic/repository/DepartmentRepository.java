@@ -12,6 +12,11 @@ import java.util.UUID;
 
 /** Tenant-scoped through @TenantId: queries only ever see the current university. */
 public interface DepartmentRepository extends JpaRepository<Department, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Override
+    @Query("select x from Department x where x.id = ?1")
+    Optional<Department> findById(UUID id);
+
     @Query("select d from Department d order by lower(d.name)")
     List<Department> sorted();
 

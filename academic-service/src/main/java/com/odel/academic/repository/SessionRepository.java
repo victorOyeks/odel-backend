@@ -12,6 +12,11 @@ import java.util.UUID;
 
 /** Tenant-scoped through @TenantId: queries only ever see the current university. */
 public interface SessionRepository extends JpaRepository<AcademicSession, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Override
+    @Query("select x from AcademicSession x where x.id = ?1")
+    Optional<AcademicSession> findById(UUID id);
+
     @Query("select s from AcademicSession s order by s.startsOn desc nulls last, s.createdAt desc")
     List<AcademicSession> newestFirst();
 

@@ -12,6 +12,11 @@ import java.util.UUID;
 
 /** Tenant-scoped through @TenantId: queries only ever see the current university. */
 public interface GradingRuleRepository extends JpaRepository<GradingRule, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Override
+    @Query("select x from GradingRule x where x.id = ?1")
+    Optional<GradingRule> findById(UUID id);
+
     @Query("select g from GradingRule g where g.programmeId is null order by g.version desc")
     List<GradingRule> defaultVersions();
 

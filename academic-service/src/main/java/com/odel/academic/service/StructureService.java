@@ -96,6 +96,7 @@ public class StructureService {
 
     @Transactional
     public Faculty saveFaculty(UUID id, FacultyIn in, AuditService.Actor actor) {
+        if (id != null) faculties.findById(id).orElseThrow(ApiException::notFound); // another university's id: 404 before any checks
         Map<String, String> f = new LinkedHashMap<>();
         if (Codes.blank(in.name())) f.put("name", "Enter the faculty's name, for example Faculty of Science.");
         if (Codes.blank(in.code()) || !Codes.unit(in.code()).matches(Codes.UNIT)) f.put("code", "Use a short code of letters and numbers, for example SCI.");
@@ -117,6 +118,7 @@ public class StructureService {
 
     @Transactional
     public Department saveDepartment(UUID id, DepartmentIn in, AuditService.Actor actor) {
+        if (id != null) departments.findById(id).orElseThrow(ApiException::notFound); // another university's id: 404 before any checks
         Map<String, String> f = new LinkedHashMap<>();
         if (in.facultyId() == null || faculties.findById(in.facultyId()).isEmpty()) f.put("facultyId", "Choose the faculty this department belongs to.");
         if (Codes.blank(in.name())) f.put("name", "Enter the department's name.");
@@ -158,6 +160,7 @@ public class StructureService {
 
     @Transactional
     public Programme saveProgramme(UUID id, ProgrammeIn in, AuditService.Actor actor) {
+        if (id != null) programmes.findById(id).orElseThrow(ApiException::notFound); // another university's id: 404 before any checks
         Map<String, String> f = new LinkedHashMap<>();
         if (in.departmentId() == null || departments.findById(in.departmentId()).isEmpty()) f.put("departmentId", "Choose the department this programme belongs to.");
         f.putAll(checkProgramme(in.name(), in.code(), in.degree(), in.durationYears(), in.entryLevels()));

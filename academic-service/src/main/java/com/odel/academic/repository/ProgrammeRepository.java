@@ -12,6 +12,11 @@ import java.util.UUID;
 
 /** Tenant-scoped through @TenantId: queries only ever see the current university. */
 public interface ProgrammeRepository extends JpaRepository<Programme, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Override
+    @Query("select x from Programme x where x.id = ?1")
+    Optional<Programme> findById(UUID id);
+
     @Query("select p from Programme p order by lower(p.name)")
     List<Programme> sorted();
 

@@ -289,7 +289,7 @@ Writes need `ODEL_ADMIN`; reads also `ODEL_DIRECTOR`.
  "page":0,"size":25,"total":64,"counts":{"total":64,"active":51,"invited":12,"suspended":1}}
 ```
 `status`: `INVITED` (has not signed in yet), `ACTIVE`, `SUSPENDED`. `search` matches name or email.
-`GET /people/{id}` → one person plus `"staffing":[{"what":"Lecturer · CSC 201 · Data Structures","session":"2026/2027"}]` from academic-service.
+`GET /people/{id}` → `{"person":<the row above>,"staffing":[{"kind":"LECTURER","what":"Lecturer · CSC 201 · Data Structures","session":"2026/2027","current":true}]}` (staffing from academic-service).
 
 ### `POST /people` (W-15b Invite)
 ```json
@@ -317,7 +317,7 @@ already has an account → `409 email_taken` "f.bello@wesleyuni.edu.ng already h
 ### Bulk invite by CSV (W-15c)
 `POST /people/uploads` `{"fileName","contentType":"text/csv","size"}` → presigned PUT (as `/academic/uploads`).
 `POST /people/imports` `{"key","fileName"}` → `{"id","totalRows","readyRows","problemRows","problems":[{"row","message"}],"status":"CHECKED"}` (nothing saved, kept for one hour);
-`POST /people/imports/{id}/confirm` → `{"invited":12,"status":"IMPORTED"}`; `GET /people/imports/template.csv`.
+`POST /people/imports/{id}/confirm` → the same body with `"status":"IMPORTED","invited":12` (rows that became invalid meanwhile are left out); `GET /people/imports/template.csv`.
 Columns `full_name,email,role,scope_type,scope_code` (`scope_code`: a course code, centre code, department or faculty code; empty for `UNIVERSITY`).
 Row checks: name, email domain, email already here or twice in the file, unknown role, wrong scope for the role, scope code not found.
 
@@ -327,7 +327,7 @@ Row checks: name, email domain, email already here or twice in the file, unknown
 You cannot remove your own `ODEL_ADMIN` role (`409 own_admin_role` "You cannot remove your own ODeL admin role. Ask another ODeL admin.").
 
 ### `GET /people/{id}/suspend-check` (W-21)
-`{"warnings":["He facilitates 2 course groups (CSC 201 Group Akure, GST 201 Group Lagos). Reassign them so students are not left without support."],"staffing":[…]}`
+`{"warnings":["They facilitate 2 course groups (CSC 201 · Data Structures · Akure Study Centre, …). Reassign them so students are not left without support."],"staffing":[…current session places…]}` (also warns about courses they lecture and centres they coordinate).
 
 ### `POST /people/{id}/suspend` `{"reason":"Left the university on 30 Nov 2026"}` → the person (`SUSPENDED`).
 Signed out at once everywhere; sign-in then ends with `?error=suspended`. Reason required (1–500 characters), kept in the audit log.
@@ -378,6 +378,13 @@ Only this university's entries; newest first; `from`/`to` are calendar days in A
   `{"total":3478,"active":120,"lastImportAt":"…","welcome":{"sent":3402,"failed":12,"notSent":64},"byCentre":[{"centreId":"uuid","students":34}]}`.
   Until it exists (connection refused or 404) academic-service treats every number as zero.
 
+## Testing note
+`AcademicSetupJourneyTest` (e2e-tests) needs the provider admin to sign in. Like B0's test it sets up the provider's two-step itself
+when it is not set up yet; otherwise set `ODEL_E2E_PROVIDER_TOTP_SECRET`. Running B0's and this test in one Maven run therefore needs
+that variable (the first test sets two-step up; locally, run them one at a time after clearing the provider's two-step).
+
 ## Changes to B0
 - `GET /setup/checklist` moved to academic-service (same shape; adds `sessionName`, `percent`).
 - tenant-service `GET /internal/tenants/{id}` also returns `portalUrl` (for invitation links).
+- notification-service `004-staff-templates.sql`: templates `staff.assigned` (email + bell) and `staff.two_step_reset` (email).
+- identity `002-staff-admin.sql`: `users.suspended_at`, `suspended_reason`, `invited_by`.

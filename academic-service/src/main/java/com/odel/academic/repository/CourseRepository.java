@@ -12,6 +12,11 @@ import java.util.UUID;
 
 /** Tenant-scoped through @TenantId: queries only ever see the current university. */
 public interface CourseRepository extends JpaRepository<Course, UUID> {
+    /** By id within the current university: a JPQL query, because Hibernate's find() by id skips the @TenantId filter. */
+    @Override
+    @Query("select x from Course x where x.id = ?1")
+    Optional<Course> findById(UUID id);
+
     @Query("select c from Course c where upper(replace(c.code, ' ', '')) = upper(replace(?1, ' ', ''))")
     Optional<Course> findByCode(String code);
 
