@@ -55,6 +55,9 @@ public class InternalClient {
         spec.header(InternalKeyFilter.HEADER, props.internalApiKey());
         UUID tenant = TenantContext.current();
         if (!TenantContext.NONE.equals(tenant)) spec.header(TenantFilter.TENANT_ID_HEADER, tenant.toString());
+        // The person's address travels with the call, so the service that writes the audit entry records them, not us.
+        String ip = com.odel.common.RequestInfo.ip();
+        if (ip != null && !ip.isBlank()) spec.header("X-Real-IP", ip);
         return spec;
     }
 
