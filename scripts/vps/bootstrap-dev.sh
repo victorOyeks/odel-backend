@@ -95,9 +95,9 @@ ENV
 fi
 
 say "5. systemd units"
-sudo cp "$HERE"/systemd/odel-*.service /etc/systemd/system/
+sudo cp "$HERE"/systemd/odel-*-service.service "$HERE"/systemd/odel-web-dev.service /etc/systemd/system/
 sudo systemctl daemon-reload
-for u in "$HERE"/systemd/odel-*.service; do sudo systemctl enable -q "$(basename "$u")"; done
+for u in "$HERE"/systemd/odel-*-service.service "$HERE"/systemd/odel-web-dev.service; do sudo systemctl enable -q "$(basename "$u")"; done
 ok "units installed and enabled; each starts once its jar (or the web bundle) arrives"
 
 say "6. nginx and certificates"
@@ -112,5 +112,11 @@ else
   sudo certbot --nginx --non-interactive --agree-tos --redirect --cert-name odel-dev.oyeksglobal.com "${args[@]}" \
     -m "${CERTBOT_EMAIL:-admin@oyeksglobal.com}" && ok "certificate issued for ${DOMAINS[*]}"
 fi
+
+say "7. Universities' own domains"
+sudo install -m 750 "$HERE/scripts/vps/odel-custom-domains.sh" /usr/local/bin/odel-custom-domains.sh
+sudo cp "$HERE/systemd/odel-custom-domains.service" "$HERE/systemd/odel-custom-domains.timer" /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable -q --now odel-custom-domains.timer
+ok "odel-custom-domains.timer runs every 2 minutes"
 
 say "Done. Push develop to odel-backend and odel-web (or run their deploy workflows by hand)."

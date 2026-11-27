@@ -138,7 +138,8 @@ public class TenantSetupService {
         }
     }
 
-    public record Changes(String name, String shortName, Branding branding) {}
+    /** webAddress: a new own domain (checked again from scratch), or "" to remove it. */
+    public record Changes(String name, String shortName, String webAddress, Branding branding) {}
 
     /** SA-01b Edit: name and branding. Colours pass the same readability check as on creation. */
     public Tenant update(UUID id, Changes in, AuditService.Actor actor) {
@@ -155,7 +156,20 @@ public class TenantSetupService {
                 if (b.accentColor() != null && !Contrast.isHex(b.accentColor())) fields.put("accentColor", "Enter a colour like #C27808.");
                 if (b.logoKey() != null && !b.logoKey().isEmpty() && !b.logoKey().matches("logos/[a-f0-9-]{36}\\.(svg|png)")) fields.put("logoKey", "Upload the logo again.");
             }
+            String web = in.webAddress() == null ? null : in.webAddress().trim().toLowerCase(Locale.ROOT);
+            if (web != null && !web.isEmpty() && !web.matches(HOST)) fields.put("webAddress", "Enter a web address like odl.wesleyuni.edu.ng, without https://.");
+            if (web != null && !web.isEmpty() && !web.equals(t.getWebAddress()) && tenants.existsByWebAddressIgnoreCase(web)) {
+                throw new ApiException(HttpStatus.CONFLICT, "web_address_taken", web + " is already used by another university.");
+            }
             if (!fields.isEmpty()) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "Some details need fixing.", fields);
+            if (web != null && !web.equals(t.getWebAddress() == null ? "" : t.getWebAddress())) {
+                t.setWebAddress(web.isEmpty() ? null : web);
+                t.setWebAddressStatus(web.isEmpty() ? Tenant.WebAddressStatus.NONE : Tenant.WebAddressStatus.WAITING_DNS);
+                t.setWebAddressError(null);
+                t.setWebAddressCheckedAt(null);
+                t.setWebAddressCertAttemptAt(null);
+                t.setWebAddressLiveAt(null);
+            }
             if (in.name() != null) t.setName(in.name().trim());
             if (in.shortName() != null) t.setShortName(in.shortName().trim());
             if (b != null) {

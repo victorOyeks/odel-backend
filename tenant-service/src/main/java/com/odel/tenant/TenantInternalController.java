@@ -11,10 +11,25 @@ import java.util.UUID;
 public class TenantInternalController {
     private final HostResolver hosts;
     private final TenantRepository tenants;
+    private final CustomDomainService domains;
 
-    public TenantInternalController(HostResolver hosts, TenantRepository tenants) {
+    public TenantInternalController(HostResolver hosts, TenantRepository tenants, CustomDomainService domains) {
         this.hosts = hosts;
         this.tenants = tenants;
+        this.domains = domains;
+    }
+
+    /** The server's odel-custom-domains job: which own domains need a certificate now. */
+    @GetMapping("/custom-domains/pending")
+    public java.util.List<CustomDomainService.Pending> pendingDomains() {
+        return domains.pending();
+    }
+
+    public record CertResult(String domain, boolean ok, String error) {}
+
+    @PostMapping("/custom-domains/{tenantId}/result")
+    public void domainResult(@PathVariable UUID tenantId, @RequestBody CertResult body) {
+        domains.result(tenantId, body.domain(), body.ok(), body.error());
     }
 
     public record HostView(UUID tenantId, String kind) {}

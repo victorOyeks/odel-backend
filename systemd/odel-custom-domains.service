@@ -1,0 +1,7 @@
+[Unit]
+Description=ODeL: certificates and nginx sites for universities' own domains
+After=network-online.target odel-tenant-service.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/odel-custom-domains.sh

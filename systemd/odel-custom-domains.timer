@@ -1,0 +1,9 @@
+[Unit]
+Description=ODeL: check for universities' own domains that need a certificate
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+
+[Install]
+WantedBy=timers.target

@@ -21,8 +21,8 @@ import java.util.UUID;
 public class Tenant {
     public enum Kind { PLATFORM, UNIVERSITY }
     public enum Status { SETTING_UP, LIVE, SUSPENDED }
-    /** The university's own domain: none, waiting for its DNS record, or live. */
-    public enum WebAddressStatus { NONE, WAITING_DNS, LIVE }
+    /** The university's own domain: none, waiting for its DNS record, pointing at us (certificate next), or live. */
+    public enum WebAddressStatus { NONE, WAITING_DNS, DNS_FOUND, LIVE }
 
     @Id
     private UUID id;
@@ -34,6 +34,10 @@ public class Tenant {
     private String webAddress;
     @Enumerated(EnumType.STRING)
     private WebAddressStatus webAddressStatus = WebAddressStatus.NONE;
+    private Instant webAddressCheckedAt;
+    private String webAddressError;
+    private Instant webAddressCertAttemptAt;
+    private Instant webAddressLiveAt;
     private String googleDomain;
     @Enumerated(EnumType.STRING)
     private Status status;

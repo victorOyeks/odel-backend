@@ -43,11 +43,14 @@ public class PlatformController {
     private final PublicContextController branding;
     private final JdbcTemplate jdbc;
     private final InternalClient internal;
+    private final CustomDomainService domains;
     private final TransactionTemplate tx;
     private final Clock clock;
 
     public PlatformController(TenantRepository tenants, TenantSetupService setup, StorageService storage,
-                              PublicContextController branding, JdbcTemplate jdbc, TransactionTemplate tx, Clock clock, InternalClient internal) {
+                              PublicContextController branding, JdbcTemplate jdbc, TransactionTemplate tx, Clock clock, InternalClient internal,
+                              @org.springframework.context.annotation.Lazy CustomDomainService domains) {
+        this.domains = domains;
         this.internal = internal;
         this.tenants = tenants;
         this.setup = setup;
@@ -68,7 +71,8 @@ public class PlatformController {
     public record BrandingView(String primaryColor, String accentColor, String logoUrl, boolean readabilityPassed) {}
 
     /** The university's own domain and what is left to do for it. pointTo = what its DNS record must point at. */
-    public record CustomDomain(String address, String status, String recordType, String pointTo) {}
+    public record CustomDomain(String address, String status, String recordType, String pointTo, Instant checkedAt,
+                               String problem, Instant liveAt) {}
 
     public record TenantDetail(UUID id, String name, String shortName, String slug, String webAddress, String portalUrl,
                                String platformUrl, CustomDomain customDomain,
@@ -113,6 +117,12 @@ public class PlatformController {
             if (size.getAsLong() > MAX_LOGO_BYTES) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "The logo is too large.", Map.of("logoKey", "Use a file under 2 MB."));
         }
         return detail(setup.update(id, body, actor(cu.user())));
+    }
+
+    /** "Check now" on the university page: looks the own domain up straight away instead of waiting for the 5-minute check. */
+    @PostMapping("/tenants/{id}/custom-domain/check")
+    public TenantDetail checkDomain(CurrentUserArg.Holder cu, @PathVariable UUID id) {
+        return detail(domains.check(id, actor(cu.user())));
     }
 
     @PostMapping("/tenants/{id}/resend-invitation")
@@ -182,14 +192,17 @@ public class PlatformController {
         boolean readable = Contrast.ratio(t.getPrimaryColor(), "#FFFFFF") >= Contrast.MIN;
         String platform = setup.platformUrl(t);
         CustomDomain custom = t.getWebAddress() == null ? null
-                : new CustomDomain(t.getWebAddress(), t.getWebAddressStatus().name(), "CNAME", platform.replaceFirst("^https?://", "").replaceFirst(":\\d+$", ""));
+                : new CustomDomain(t.getWebAddress(), t.getWebAddressStatus().name(), "CNAME", platform.replaceFirst("^https?://", "").replaceFirst(":\\d+$", ""),
+                        t.getWebAddressCheckedAt(), t.getWebAddressError(), t.getWebAddressLiveAt());
         List<NextStep> steps = new java.util.ArrayList<>();
         steps.add(new NextStep("University created with its own data, kept apart from every other university", true));
         steps.add(new NextStep("Live at " + platform, true));
         if (custom != null) {
-            steps.add(t.getWebAddressStatus() == Tenant.WebAddressStatus.LIVE
-                    ? new NextStep("Own domain live: " + t.getWebAddress(), true)
-                    : new NextStep("Waiting for the university's IT team: a CNAME record for " + t.getWebAddress() + " pointing to " + custom.pointTo(), false));
+            steps.add(switch (t.getWebAddressStatus()) {
+                case LIVE -> new NextStep("Own domain live: https://" + t.getWebAddress(), true);
+                case DNS_FOUND -> new NextStep(t.getWebAddress() + " points to the platform; issuing its certificate (a few minutes)", false);
+                default -> new NextStep("Waiting for the university's IT team: a CNAME record for " + t.getWebAddress() + " pointing to " + custom.pointTo(), false);
+            });
         }
         steps.add(admin == null ? new NextStep("First admin not invited yet", false)
                 : admin.accepted() ? new NextStep(admin.fullName() + " accepted the invitation and signed in", true)
