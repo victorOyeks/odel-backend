@@ -305,7 +305,7 @@ Switch to `http` once academic-service serves the endpoint.
   creates `PASSWORD` users with status `INVITED` and role `STUDENT`, or updates the one with that matric number.
 - `POST /internal/students/email-conflicts` `{"entries":[{"matricNumber","email"}]}` → `{"conflicts":[{"matricNumber","email"}]}` (emails used by another account).
 - `GET /internal/students/accounts/{userId}` → `{"status","lastSignInAt","lockedUntil","consentVersion","consentAt","activatedAt"}`.
-- `PATCH /internal/students/accounts/{userId}` `{"matricNumber","fullName","email","phone"}`; `409 matric_taken|email_taken`.
+- `POST /internal/students/accounts/{userId}/change` `{"matricNumber","fullName","email","phone"}`; `409 matric_taken|email_taken`.
 - `POST /internal/students/accounts/{userId}/suspend` · `/reinstate` (suspend ends every session).
 - `POST /internal/students/accounts/{userId}/password-reset` → emails a reset code (W-22b).
 

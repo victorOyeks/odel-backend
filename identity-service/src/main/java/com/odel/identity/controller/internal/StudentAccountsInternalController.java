@@ -113,7 +113,7 @@ public class StudentAccountsInternalController {
                 locked, u.getConsentVersion(), u.getConsentAt());
     }
 
-    @PatchMapping("/accounts/{userId}")
+    @PostMapping("/accounts/{userId}/change")
     @Transactional
     public AccountView change(@PathVariable UUID userId, @RequestBody ChangeRequest body) {
         User u = student(userId);

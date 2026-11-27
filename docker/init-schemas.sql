@@ -3,3 +3,4 @@ create schema if not exists app;
 create schema if not exists identity;
 create schema if not exists tenant;
 create schema if not exists notification;
+create schema if not exists student;

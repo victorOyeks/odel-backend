@@ -9,6 +9,7 @@ project, one Spring Boot service per module, one Postgres database (a schema per
 | `identity-service` | 9301 | Staff and provider accounts, roles, Google sign-in, two-step codes, sessions |
 | `tenant-service` | 9302 | Universities (tenants), branding, provider console, setup checklist |
 | `notification-service` | 9303 | Email (Brevo), in-app bell, browser push, templates, background job queue |
+| `student-service` | 9305 | Student records, portal CSV import, welcome emails, students list and record (B1) |
 | `common` | (library) | Errors, tenancy, sessions and security, audit log, signed file links, internal calls |
 | `e2e-tests` | (tests) | Each build phase's end-to-end journey, run against a running stack |
 
@@ -71,5 +72,6 @@ them in order (tenant, identity, notification, gateway) with a health check and 
 ## Docs
 
 - `docs/api-b0.md`: the API contract for B0.
+- `docs/api-b1-students.md`: B1 students (import, welcome emails, student activation, sign-in and reset).
 - `docs/tech-stack.md`: what each technology is for.
 - Build plan: the "Build plan" tab of the presenter's guide (B0–B12).

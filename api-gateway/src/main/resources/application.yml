@@ -24,6 +24,10 @@ spring:
           uri: http://${NOTIFICATION_HOST:127.0.0.1}:9303
           predicates:
             - Path=/api/v1/notifications,/api/v1/notifications/**,/api/v1/push-tokens,/api/v1/dev/emails,/api-docs/notification
+        - id: student-service
+          uri: http://${STUDENT_HOST:127.0.0.1}:9305
+          predicates:
+            - Path=/api/v1/students,/api/v1/students/**,/api/v1/imports/**,/api/v1/student-profile,/api-docs/student
 
 odel:
   internal-api-key: ${ODEL_INTERNAL_API_KEY:dev-internal-key}
@@ -41,6 +45,8 @@ springdoc:
         url: /api-docs/tenant
       - name: notification-service
         url: /api-docs/notification
+      - name: student-service
+        url: /api-docs/student
 
 management:
   endpoints:

@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: student-service
+  config:
+    import: classpath:odel-common.yml
+  datasource:
+    # One Postgres database; this service owns schema "student". "app" holds the shared audit log.
+    url: jdbc:postgresql://${ODEL_DB_HOST:localhost}:${ODEL_DB_PORT:5440}/${ODEL_DB_NAME:odel}?currentSchema=student,app&reWriteBatchedInserts=true
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    default-schema: student
+  jpa:
+    properties:
+      hibernate.default_schema: student
+  servlet:
+    multipart:
+      max-file-size: 10MB
+
+server:
+  port: ${STUDENT_PORT:9305}
+
+springdoc:
+  api-docs:
+    path: /api-docs/student
+  swagger-ui:
+    enabled: false   # one Swagger UI for every service, on the api-gateway
+
+odel:
+  student:
+    # Programme and centre codes come from academic-service (GET /internal/academic/lookup).
+    # stub = built-in Wesley-like data, until academic-service is merged; http = ask academic-service.
+    academic-lookup: ${ODEL_ACADEMIC_LOOKUP:http}
+    academic-url: ${ODEL_ACADEMIC_URL:http://127.0.0.1:9304}
+    welcome-worker: ${ODEL_STUDENT_WELCOME_WORKER:true}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+odel:
+  student:
+    academic-lookup: ${ODEL_ACADEMIC_LOOKUP:stub}
