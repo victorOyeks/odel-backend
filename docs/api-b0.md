@@ -1,5 +1,8 @@
 # API contract · B0 Platform base
 
+Later phases: B1 is `docs/api-b1-academic.md` (academic setup, People & roles, audit log) and `docs/api-b1-students.md`
+(students import, welcome emails, student accounts).
+
 The API is one Spring Boot app. All paths start with `/api/v1`. The web app (odel-web) calls it through a same-origin proxy: the browser only ever talks to the web host, and Next.js forwards `/api/*` to the API. Session and CSRF cookies are therefore first-party on the web host.
 
 ## Hosts and tenants
@@ -104,6 +107,8 @@ W-06 and the role switcher (S-03). Returns the session body. Remembered for next
 S-04. `204`; cookie cleared. Then show S-02 (`/staff/sign-in?signedOut=1`).
 
 ## Setup checklist (W-10, role ODEL_ADMIN)
+
+From B1 the checklist is served by academic-service from real data (same path); see `docs/api-b1-academic.md`.
 
 ### `GET /setup/checklist`
 ```json

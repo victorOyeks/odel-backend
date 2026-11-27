@@ -6,11 +6,11 @@ project, one Spring Boot service per module, one Postgres database (a schema per
 | Module | Port | Owns |
 |---|---|---|
 | `api-gateway` | 9300 | The only way in. Routes `/api/v1/**`, works out the university from the browser's host, one Swagger page for all services |
-| `identity-service` | 9301 | Staff and provider accounts, roles, Google sign-in, two-step codes, sessions, People & roles, the university's audit log |
+| `identity-service` | 9301 | Staff, student and provider accounts, roles, Google sign-in, two-step codes, sessions, student activation, password sign-in and reset, People & roles, the university's audit log |
 | `tenant-service` | 9302 | Universities (tenants), branding, provider console |
 | `notification-service` | 9303 | Email (Brevo), in-app bell, browser push, templates, background job queue |
-| `academic-service` | 9304 | Sessions and semesters, faculties → departments → programmes, course catalogue, study centres and rooms, staffing, grading rules, the setup checklist |
-| `student-service` | 9305 | Student records, portal CSV import, welcome emails, students list and record (B1) |
+| `academic-service` | 9304 | Sessions and semesters, faculties → departments → programmes, course catalogue, study centres and rooms, staffing, versioned grading rules, structure and catalogue CSV imports, the setup checklist (schema `academic`) |
+| `student-service` | 9305 | Student records and history, portal CSV import (row-by-row check, then confirm), welcome emails and delivery report, students list and record (schema `student`) |
 | `common` | (library) | Errors, tenancy, sessions and security, audit log, signed file links, internal calls |
 | `e2e-tests` | (tests) | Each build phase's end-to-end journey, run against a running stack |
 
@@ -24,6 +24,29 @@ How the pieces talk:
 - Services call each other on `/internal/**` with the shared `X-Internal-Key`; the gateway never routes `/internal`.
 - Each table carries `tenant_id`; Hibernate `@TenantId` filters every query by the current university.
 - One audit log, `app.audit_log`, written by every service.
+- Lookups by id go through a repository query (`findInTenant`, or a `findById` overridden with `@Query`): Hibernate's
+  `find()` by id skips the `@TenantId` filter, so the inherited `findById` must not be used with an id from a request.
+
+## Code layout
+
+Every service has the same layered packages (as in hospio-backend), the Application class at the root:
+
+```
+com.odel.<service>
+├── <Service>Application.java   scans com.odel (common included); entities and repositories under it
+├── controller                  public endpoints (/api/v1/**), dev-only ones guarded by @ConditionalOnProperty
+│   └── internal                /internal/** endpoints for other services
+├── service                     business logic (notification-service: service/jobs for the background job queue)
+├── repository                  Spring Data repositories
+├── entity                      JPA entities
+├── dto                         request and response records, grouped per area (<Area>Dtos)
+├── client                      calls to other services and outside providers (Google, Brevo, web push)
+├── config                      start-up and configuration beans
+└── devseed                     dev-only seed data, when a service has any
+```
+
+`api-gateway` has `filter` (tenant header, access log) and `config` (service-down handler). `common` keeps its own
+sub-packages (audit, files, instrumentation, internal, security, tenancy). Tests mirror the main packages.
 
 ## Run locally
 
@@ -43,12 +66,17 @@ Offline Maven (this machine cannot reach Maven Central): `.mvn/maven.config` let
 
 ## Tests
 
-`mvn verify` runs each module's unit tests. The B0 journey (provider creates a university, its first admin signs in
-with two-step codes and lands on the empty setup checklist, edge cases, tenant isolation) runs through the gateway:
+`mvn verify` runs each module's unit tests. The journeys run through the gateway of a running stack (all six services):
+`PlatformBaseJourneyTest` (B0: provider creates a university, its first admin signs in with two-step codes),
+`AcademicSetupJourneyTest` (B1: W-10 set-up, People & roles, audit log) and `StudentsInJourneyTest` (B1: import, welcome
+emails, student activation, sign-in and reset, the 3,504-row timing; it builds its programmes and centres through academic-service).
 
 ```bash
-ODEL_E2E_GATEWAY=http://localhost:9300 mvn -pl e2e-tests test
+ODEL_E2E_GATEWAY=http://localhost:9300 mvn -pl e2e-tests test -Dtest=PlatformBaseJourneyTest
 ```
+
+Run them one at a time: each sets up the provider's two-step afresh, so between runs clear the provider's two-step and
+the `odel:totp-used:*` keys in Redis (a code's time step is refused for two minutes after it is used).
 
 ## Database
 
