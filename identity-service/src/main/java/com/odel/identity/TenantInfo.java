@@ -8,7 +8,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** What identity-service needs to know about a university, from tenant-service (cached for a minute). */
-public record TenantInfo(UUID id, String kind, String slug, String name, String shortName, String googleDomain, String status) {
+public record TenantInfo(UUID id, String kind, String slug, String name, String shortName, String googleDomain, String status,
+                         String primaryColor, String accentColor) {
     public boolean isPlatform() { return "PLATFORM".equals(kind); }
 
     @Component

@@ -20,10 +20,10 @@ public class TenantInternalController {
     public record HostView(UUID tenantId, String kind) {}
 
     public record TenantView(UUID id, String kind, String slug, String name, String shortName, String googleDomain,
-                             String status, String primaryColor) {
+                             String status, String primaryColor, String accentColor) {
         static TenantView of(Tenant t) {
             return new TenantView(t.getId(), t.getKind().name(), t.getSlug(), t.getName(), t.getShortName(),
-                    t.getGoogleDomain(), t.getStatus().name(), t.getPrimaryColor());
+                    t.getGoogleDomain(), t.getStatus().name(), t.getPrimaryColor(), t.getAccentColor());
         }
     }
 

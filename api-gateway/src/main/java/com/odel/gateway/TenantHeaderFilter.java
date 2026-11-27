@@ -7,6 +7,7 @@ import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -66,8 +67,13 @@ public class TenantHeaderFilter implements GlobalFilter, Ordered {
                 .retrieve().bodyToMono(Map.class)
                 .map(m -> new Resolved(String.valueOf(m.get("tenantId")), String.valueOf(m.get("kind"))))
                 .timeout(Duration.ofSeconds(3))
-                .onErrorResume(e -> Mono.just(NONE))
-                .doOnNext(r -> cache.put(host, new Cached(r, System.currentTimeMillis())));
+                .doOnNext(r -> cache.put(host, new Cached(r, System.currentTimeMillis())))
+                // "No such university" is an answer and is cached; tenant-service being down is not, so the next request asks again.
+                .onErrorResume(WebClientResponseException.NotFound.class, e -> {
+                    cache.put(host, new Cached(NONE, System.currentTimeMillis()));
+                    return Mono.just(NONE);
+                })
+                .onErrorResume(e -> Mono.just(NONE));
     }
 
     @Override
