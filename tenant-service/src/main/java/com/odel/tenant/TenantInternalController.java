@@ -12,11 +12,13 @@ public class TenantInternalController {
     private final HostResolver hosts;
     private final TenantRepository tenants;
     private final CustomDomainService domains;
+    private final TenantSetupService setup;
 
-    public TenantInternalController(HostResolver hosts, TenantRepository tenants, CustomDomainService domains) {
+    public TenantInternalController(HostResolver hosts, TenantRepository tenants, CustomDomainService domains, TenantSetupService setup) {
         this.hosts = hosts;
         this.tenants = tenants;
         this.domains = domains;
+        this.setup = setup;
     }
 
     /** The server's odel-custom-domains job: which own domains need a certificate now. */
@@ -35,10 +37,10 @@ public class TenantInternalController {
     public record HostView(UUID tenantId, String kind) {}
 
     public record TenantView(UUID id, String kind, String slug, String name, String shortName, String googleDomain,
-                             String status, String primaryColor, String accentColor) {
-        static TenantView of(Tenant t) {
+                             String status, String primaryColor, String accentColor, String portalUrl) {
+        static TenantView of(Tenant t, String portalUrl) {
             return new TenantView(t.getId(), t.getKind().name(), t.getSlug(), t.getName(), t.getShortName(),
-                    t.getGoogleDomain(), t.getStatus().name(), t.getPrimaryColor(), t.getAccentColor());
+                    t.getGoogleDomain(), t.getStatus().name(), t.getPrimaryColor(), t.getAccentColor(), portalUrl);
         }
     }
 
@@ -52,6 +54,7 @@ public class TenantInternalController {
 
     @GetMapping("/tenants/{id}")
     public TenantView tenant(@PathVariable UUID id) {
-        return tenants.findById(id).map(TenantView::of).orElseThrow(ApiException::notFound);
+        // portalUrl: where emails should send people (the university's own domain once live, else its platform address).
+        return tenants.findById(id).map(t -> TenantView.of(t, t.isPlatform() ? null : setup.portalUrl(t))).orElseThrow(ApiException::notFound);
     }
 }

@@ -9,8 +9,8 @@ ENV_FILE=$ROOT/.env.dev
 DB_NAME=${DB_NAME:-odel}
 DB_USER=${DB_USER:-odel_user}
 DEPLOY_USER=${DEPLOY_USER:-$USER}
-SERVICES=(api-gateway identity-service tenant-service notification-service)
-SCHEMAS=(app identity tenant notification)
+SERVICES=(api-gateway identity-service tenant-service notification-service academic-service)
+SCHEMAS=(app identity tenant notification academic)
 DOMAINS=(odel-dev.oyeksglobal.com odel-console-dev.oyeksglobal.com odel-api-dev.oyeksglobal.com)
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 
