@@ -1,5 +1,7 @@
 package com.odel.notification.controller.internal;
 
+import com.odel.notification.dto.MessageDtos;
+
 import com.odel.notification.service.MessageService;
 
 import com.odel.common.tenancy.TenantContext;
@@ -27,7 +29,7 @@ public class NotificationInternalController {
     }
 
     @PostMapping("/messages")
-    public ResponseEntity<Map<String, Object>> send(@RequestBody MessageService.Message message) {
+    public ResponseEntity<Map<String, Object>> send(@RequestBody MessageDtos.Message message) {
         TenantContext.require();
         UUID emailId = messages.send(message);
         return ResponseEntity.ok(emailId == null ? Map.of() : Map.of("emailId", emailId));

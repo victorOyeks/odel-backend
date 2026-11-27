@@ -1,5 +1,7 @@
 package com.odel.identity.controller.internal;
 
+import com.odel.identity.dto.IdentityInternalDtos.*;
+
 import com.odel.identity.entity.User;
 import com.odel.identity.entity.RoleAssignment;
 import com.odel.identity.repository.UserRepository;
@@ -30,14 +32,6 @@ public class IdentityInternalController {
         this.users = users;
         this.roles = roles;
         this.clock = clock;
-    }
-
-    public record NewStaff(String fullName, String email, Role role, ScopeType scopeType, String scopeLabel, UUID createdBy) {}
-
-    public record StaffView(UUID id, String fullName, String email, Instant invitedAt, boolean accepted, Instant acceptedAt) {
-        static StaffView of(User u) {
-            return new StaffView(u.getId(), u.getFullName(), u.getEmail(), u.getInvitedAt(), u.getAcceptedAt() != null, u.getAcceptedAt());
-        }
     }
 
     /** Invites a staff member (a university's first admin, from tenant-service). */

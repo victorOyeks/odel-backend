@@ -1,5 +1,7 @@
 package com.odel.identity.controller;
 
+import com.odel.identity.client.TenantInfoClient;
+
 import com.odel.common.tenancy.TenantContext;
 import com.odel.identity.dto.SessionView;
 import com.odel.identity.dto.TenantInfo;
@@ -21,9 +23,9 @@ import static com.odel.identity.service.StudentCodeStore.Purpose;
 @RequestMapping("/api/v1/auth/student")
 public class StudentAuthController {
     private final StudentAuthService auth;
-    private final TenantInfo.Client tenants;
+    private final TenantInfoClient tenants;
 
-    public StudentAuthController(StudentAuthService auth, TenantInfo.Client tenants) {
+    public StudentAuthController(StudentAuthService auth, TenantInfoClient tenants) {
         this.auth = auth;
         this.tenants = tenants;
     }

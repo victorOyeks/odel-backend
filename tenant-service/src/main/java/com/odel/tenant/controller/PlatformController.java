@@ -1,5 +1,9 @@
 package com.odel.tenant.controller;
 
+import com.odel.tenant.dto.PlatformDtos;
+
+import com.odel.tenant.dto.PlatformDtos.*;
+
 import com.odel.tenant.service.TenantSetupService;
 import com.odel.tenant.service.CustomDomainService;
 import com.odel.tenant.service.Contrast;
@@ -65,24 +69,6 @@ public class PlatformController {
         this.clock = clock;
     }
 
-    public record AdminView(String fullName, String email, Instant invitedAt, boolean accepted, Instant acceptedAt) {}
-
-    public record TenantRow(UUID id, String name, String shortName, String slug, String webAddress, String status,
-                            long students, long centres, Instant createdAt, AdminView firstAdmin) {}
-
-    public record NextStep(String label, boolean done) {}
-
-    public record BrandingView(String primaryColor, String accentColor, String logoUrl, boolean readabilityPassed) {}
-
-    /** The university's own domain and what is left to do for it. pointTo = what its DNS record must point at. */
-    public record CustomDomain(String address, String status, String recordType, String pointTo, Instant checkedAt,
-                               String problem, Instant liveAt) {}
-
-    public record TenantDetail(UUID id, String name, String shortName, String slug, String webAddress, String portalUrl,
-                               String platformUrl, CustomDomain customDomain,
-                               String googleDomain, String status, Instant createdAt, Map<String, String> createdBy,
-                               BrandingView branding, AdminView firstAdmin, List<NextStep> nextSteps) {}
-
     @GetMapping("/tenants")
     public Map<String, List<TenantRow>> list() {
         List<TenantRow> rows = tenants.findByKindOrderByCreatedAtDesc(Tenant.Kind.UNIVERSITY).stream()
@@ -92,13 +78,13 @@ public class PlatformController {
     }
 
     @GetMapping("/tenants/address-available")
-    public Map<String, TenantSetupService.Availability> available(@RequestParam(required = false) String webAddress,
+    public Map<String, PlatformDtos.Availability> available(@RequestParam(required = false) String webAddress,
                                                                   @RequestParam(required = false) String slug) {
         return setup.availability(webAddress, slug);
     }
 
     @PostMapping("/tenants")
-    public ResponseEntity<TenantDetail> create(CurrentUserArg.Holder cu, @RequestBody TenantSetupService.NewUniversity body) {
+    public ResponseEntity<TenantDetail> create(CurrentUserArg.Holder cu, @RequestBody PlatformDtos.NewUniversity body) {
         if (body.branding() != null && body.branding().logoKey() != null) {
             var size = storage.size(body.branding().logoKey());
             if (size.isEmpty()) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "The logo did not upload.", Map.of("logoKey", "Upload the logo again."));
@@ -114,7 +100,7 @@ public class PlatformController {
     }
 
     @PatchMapping("/tenants/{id}")
-    public TenantDetail update(CurrentUserArg.Holder cu, @PathVariable UUID id, @RequestBody TenantSetupService.Changes body) {
+    public TenantDetail update(CurrentUserArg.Holder cu, @PathVariable UUID id, @RequestBody PlatformDtos.Changes body) {
         if (body.branding() != null && body.branding().logoKey() != null && !body.branding().logoKey().isEmpty()) {
             var size = storage.size(body.branding().logoKey());
             if (size.isEmpty()) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "The logo did not upload.", Map.of("logoKey", "Upload the logo again."));
@@ -134,8 +120,6 @@ public class PlatformController {
         setup.resendInvitation(id, actor(cu.user()));
         return ResponseEntity.noContent().build();
     }
-
-    public record LogoUploadRequest(String fileName, String contentType, Long size) {}
 
     @PostMapping("/logo-uploads")
     public Map<String, Object> logoUpload(@RequestBody LogoUploadRequest body) {
@@ -158,9 +142,6 @@ public class PlatformController {
         if (!key.matches("logos/[a-f0-9-]{36}\\.(svg|png)")) throw ApiException.notFound();
         return Map.of("url", storage.presignGet(key, Duration.ofMinutes(30)));
     }
-
-    public record AuditRow(UUID id, Instant at, Map<String, String> actor, String action, String summary,
-                           Map<String, Object> tenant, String ip) {}
 
     @GetMapping("/audit")
     public PageResponse<AuditRow> audit(@RequestParam(required = false) UUID tenantId, @RequestParam(defaultValue = "0") int page,

@@ -1,5 +1,7 @@
 package com.odel.identity.service;
 
+import com.odel.identity.client.TenantInfoClient;
+
 import com.odel.common.ApiException;
 import com.odel.common.OdelProperties;
 import com.odel.common.RequestInfo;
@@ -59,7 +61,7 @@ public class StudentAuthService {
     private final RoleAssignmentRepository roles;
     private final StudentCodeStore store;
     private final StudentServiceClient students;
-    private final TenantInfo.Client tenants;
+    private final TenantInfoClient tenants;
     private final InternalClient internal;
     private final SessionStore sessions;
     private final SessionCookies cookies;
@@ -70,7 +72,7 @@ public class StudentAuthService {
     private final Clock clock;
 
     public StudentAuthService(UserRepository users, StudentUserRepository byId, RoleAssignmentRepository roles, StudentCodeStore store, StudentServiceClient students,
-                              TenantInfo.Client tenants, InternalClient internal, SessionStore sessions, SessionCookies cookies,
+                              TenantInfoClient tenants, InternalClient internal, SessionStore sessions, SessionCookies cookies,
                               SignInService signIn, AuditService audit, TransactionTemplate tx, OdelProperties props, Clock clock) {
         this.users = users;
         this.byId = byId;

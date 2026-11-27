@@ -1,5 +1,7 @@
 package com.odel.identity.controller;
 
+import com.odel.identity.client.TenantInfoClient;
+
 import com.odel.identity.entity.User;
 import com.odel.identity.repository.UserRepository;
 import com.odel.identity.repository.RoleAssignmentRepository;
@@ -36,12 +38,12 @@ import java.util.stream.Collectors;
 @ConditionalOnProperty(name = "odel.google.dev-stub", havingValue = "true")
 public class DevController {
     private final SignInService signIn;
-    private final TenantInfo.Client tenants;
+    private final TenantInfoClient tenants;
     private final UserRepository users;
     private final RoleAssignmentRepository roles;
     private final org.springframework.transaction.support.TransactionTemplate tx;
 
-    public DevController(SignInService signIn, TenantInfo.Client tenants, UserRepository users, RoleAssignmentRepository roles,
+    public DevController(SignInService signIn, TenantInfoClient tenants, UserRepository users, RoleAssignmentRepository roles,
                          org.springframework.transaction.support.TransactionTemplate tx) {
         this.signIn = signIn;
         this.tenants = tenants;

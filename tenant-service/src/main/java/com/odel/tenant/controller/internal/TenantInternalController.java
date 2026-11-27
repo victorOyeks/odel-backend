@@ -1,5 +1,7 @@
 package com.odel.tenant.controller.internal;
 
+import com.odel.tenant.dto.TenantInternalDtos.*;
+
 import com.odel.tenant.service.TenantSetupService;
 import com.odel.tenant.service.CustomDomainService;
 import com.odel.tenant.service.HostResolver;
@@ -33,21 +35,9 @@ public class TenantInternalController {
         return domains.pending();
     }
 
-    public record CertResult(String domain, boolean ok, String error) {}
-
     @PostMapping("/custom-domains/{tenantId}/result")
     public void domainResult(@PathVariable UUID tenantId, @RequestBody CertResult body) {
         domains.result(tenantId, body.domain(), body.ok(), body.error());
-    }
-
-    public record HostView(UUID tenantId, String kind) {}
-
-    public record TenantView(UUID id, String kind, String slug, String name, String shortName, String googleDomain,
-                             String status, String primaryColor, String accentColor, String portalUrl) {
-        static TenantView of(Tenant t, String portalUrl) {
-            return new TenantView(t.getId(), t.getKind().name(), t.getSlug(), t.getName(), t.getShortName(),
-                    t.getGoogleDomain(), t.getStatus().name(), t.getPrimaryColor(), t.getAccentColor(), portalUrl);
-        }
     }
 
     /** The gateway asks this for every new host it sees (and caches the answer). */

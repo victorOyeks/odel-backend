@@ -1,5 +1,7 @@
 package com.odel.tenant.service;
 
+import com.odel.tenant.dto.PlatformDtos.*;
+
 import com.odel.common.*;
 import com.odel.common.tenancy.*;
 import com.odel.common.security.*;
@@ -58,15 +60,6 @@ public class TenantSetupService {
     }
 
     static final String RESERVED_MESSAGE = "Use a real domain the university controls; test domains like .test or example.com can never be reached.";
-
-    public record Branding(String primaryColor, String accentColor, String logoKey) {}
-
-    public record FirstAdmin(String fullName, String email) {}
-
-    public record NewUniversity(String name, String shortName, String slug, String webAddress, String googleDomain,
-                                Branding branding, FirstAdmin firstAdmin) {}
-
-    public record Availability(boolean available, String message) {}
 
     public Map<String, Availability> availability(String webAddress, String slug) {
         Map<String, Availability> out = new LinkedHashMap<>();
@@ -148,9 +141,6 @@ public class TenantSetupService {
         }
     }
 
-    /** webAddress: a new own domain (checked again from scratch), or "" to remove it. */
-    public record Changes(String name, String shortName, String webAddress, Branding branding) {}
-
     /** SA-01b Edit: name and branding. Colours pass the same readability check as on creation. */
     public Tenant update(UUID id, Changes in, AuditService.Actor actor) {
         return tx.execute(st -> {
@@ -204,9 +194,6 @@ public class TenantSetupService {
             return t;
         });
     }
-
-    /** The first admin as identity-service reports it. */
-    public record Admin(UUID id, String fullName, String email, Instant invitedAt, boolean accepted, Instant acceptedAt) {}
 
     public void resendInvitation(UUID tenantId, AuditService.Actor actor) {
         Tenant t = tenants.findById(tenantId).filter(x -> !x.isPlatform()).orElseThrow(ApiException::notFound);

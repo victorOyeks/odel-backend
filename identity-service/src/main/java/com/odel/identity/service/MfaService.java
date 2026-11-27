@@ -1,5 +1,9 @@
 package com.odel.identity.service;
 
+import com.odel.identity.client.TenantInfoClient;
+
+import com.odel.identity.dto.AuthDtos.*;
+
 import com.odel.identity.entity.TrustedDevice;
 
 import com.odel.identity.entity.MfaBackupCode;
@@ -49,7 +53,7 @@ public class MfaService {
     private final UserRepository users;
     private final MfaBackupCodeRepository backupCodes;
     private final TrustedDeviceRepository trusted;
-    private final TenantInfo.Client tenants;
+    private final TenantInfoClient tenants;
     private final SessionStore sessions;
     private final SessionCookies cookies;
     private final SignInService signIn;
@@ -61,7 +65,7 @@ public class MfaService {
     private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder(8);
 
     public MfaService(UserRepository users, MfaBackupCodeRepository backupCodes, TrustedDeviceRepository trusted,
-                      TenantInfo.Client tenants, SessionStore sessions, SessionCookies cookies, SignInService signIn,
+                      TenantInfoClient tenants, SessionStore sessions, SessionCookies cookies, SignInService signIn,
                       SecretBox box, AuditService audit, StringRedisTemplate redis, OdelProperties props, Clock clock) {
         this.users = users;
         this.backupCodes = backupCodes;
@@ -76,12 +80,6 @@ public class MfaService {
         this.props = props;
         this.clock = clock;
     }
-
-    public record Setup(String secret, String secretGrouped, String otpauthUri) {}
-
-    public record Confirmed(List<String> backupCodes, SessionView session) {}
-
-    public record Verified(SessionView session, Integer backupCodesLeft) {}
 
     @Transactional
     public Setup setup(CurrentUser cu) {

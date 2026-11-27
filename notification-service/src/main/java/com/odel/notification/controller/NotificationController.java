@@ -1,5 +1,7 @@
 package com.odel.notification.controller;
 
+import com.odel.notification.dto.NotificationDtos.*;
+
 import com.odel.notification.entity.Notification;
 import com.odel.notification.entity.PushToken;
 import com.odel.notification.repository.NotificationRepository;
@@ -42,12 +44,6 @@ public class NotificationController {
         this.clock = clock;
     }
 
-    public record Item(UUID id, String type, String title, String body, String link, Instant createdAt, Instant readAt) {
-        static Item of(Notification n) {
-            return new Item(n.getId(), n.getType(), n.getTitle(), n.getBody(), n.getLink(), n.getCreatedAt(), n.getReadAt());
-        }
-    }
-
     @GetMapping("/notifications")
     @Transactional(readOnly = true)
     public PageResponse<Item> list(CurrentUserArg.Holder cu, @RequestParam(defaultValue = "0") int page,
@@ -76,8 +72,6 @@ public class NotificationController {
         notifications.markAllRead(cu.user().userId(), clock.instant());
         return ResponseEntity.noContent().build();
     }
-
-    public record TokenRequest(@NotBlank @Size(max = 500) String token, String platform) {}
 
     @PostMapping("/push-tokens")
     @Transactional

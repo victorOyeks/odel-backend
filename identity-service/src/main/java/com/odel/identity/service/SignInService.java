@@ -1,5 +1,7 @@
 package com.odel.identity.service;
 
+import com.odel.identity.client.TenantInfoClient;
+
 import com.odel.identity.entity.RoleAssignment;
 
 import com.odel.identity.dto.SessionView;
@@ -60,7 +62,7 @@ public class SignInService {
     private final StringRedisTemplate redis;
     private final ObjectMapper json;
     private final OdelProperties props;
-    private final TenantInfo.Client tenants;
+    private final TenantInfoClient tenants;
     private final UserRepository users;
     private final RoleAssignmentRepository roles;
     private final TrustedDeviceRepository trusted;
@@ -71,7 +73,7 @@ public class SignInService {
     private final TransactionTemplate tx;
     private final Clock clock;
 
-    public SignInService(StringRedisTemplate redis, ObjectMapper json, OdelProperties props, TenantInfo.Client tenants,
+    public SignInService(StringRedisTemplate redis, ObjectMapper json, OdelProperties props, TenantInfoClient tenants,
                          UserRepository users, RoleAssignmentRepository roles, TrustedDeviceRepository trusted,
                          SessionStore sessions, SessionCookies cookies, AuditService audit, GoogleClient google,
                          TransactionTemplate tx, Clock clock) {

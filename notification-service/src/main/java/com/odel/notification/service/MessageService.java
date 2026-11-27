@@ -1,5 +1,7 @@
 package com.odel.notification.service;
 
+import com.odel.notification.dto.MessageDtos.*;
+
 import com.odel.notification.service.jobs.EmailJob;
 import com.odel.notification.service.jobs.PushJob;
 import com.odel.notification.entity.Notification;
@@ -49,15 +51,6 @@ public class MessageService {
         this.pushTokens = pushTokens;
         this.clock = clock;
     }
-
-    /**
-     * @param userId may be null for someone without an account yet (then only email goes)
-     * @param link   where the bell item and push open, on the person's portal
-     */
-    public record Message(UUID userId, String email, String templateKey, Map<String, ?> vars, String link, TenantLook tenant) {}
-
-    /** The university's name and colour, sent by the caller so emails carry its branding. */
-    public record TenantLook(String name, String shortName, String primaryColor) {}
 
     /** Runs in the current tenant. Returns the email's outbound id, or null when there is no email template. */
     @Transactional

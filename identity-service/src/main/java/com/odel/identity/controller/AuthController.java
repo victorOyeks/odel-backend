@@ -1,5 +1,9 @@
 package com.odel.identity.controller;
 
+import com.odel.identity.dto.AuthDtos;
+
+import com.odel.identity.dto.AuthDtos.*;
+
 import com.odel.identity.service.MfaService;
 import com.odel.identity.service.SignInService;
 import com.odel.identity.dto.SessionView;
@@ -53,17 +57,13 @@ public class AuthController {
         return redirect(signIn.handoff(code, TenantFilter.resolved(request), request, response));
     }
 
-    public record CodeRequest(String code, Boolean trustDevice) {
-        boolean trust() { return Boolean.TRUE.equals(trustDevice); }
-    }
-
     @PostMapping("/mfa/setup")
-    public MfaService.Setup setup(CurrentUserArg.Holder cu) {
+    public AuthDtos.Setup setup(CurrentUserArg.Holder cu) {
         return mfa.setup(cu.user());
     }
 
     @PostMapping("/mfa/setup/confirm")
-    public MfaService.Confirmed confirm(CurrentUserArg.Holder cu, @RequestBody CodeRequest body, HttpServletResponse response) {
+    public AuthDtos.Confirmed confirm(CurrentUserArg.Holder cu, @RequestBody CodeRequest body, HttpServletResponse response) {
         return mfa.confirm(cu.user(), body.code(), response);
     }
 
@@ -74,11 +74,9 @@ public class AuthController {
 
     @PostMapping("/mfa/backup")
     public BackupVerified backup(CurrentUserArg.Holder cu, @RequestBody CodeRequest body, HttpServletResponse response) {
-        MfaService.Verified v = mfa.backup(cu.user(), body.code(), body.trust(), response);
+        AuthDtos.Verified v = mfa.backup(cu.user(), body.code(), body.trust(), response);
         return new BackupVerified(v.session(), v.backupCodesLeft());
     }
-
-    public record BackupVerified(SessionView session, Integer backupCodesLeft) {}
 
     private static ResponseEntity<Void> redirect(String location) {
         return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, location).build();

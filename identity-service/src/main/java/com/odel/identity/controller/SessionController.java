@@ -1,5 +1,7 @@
 package com.odel.identity.controller;
 
+import com.odel.identity.dto.AuthDtos.*;
+
 import com.odel.identity.entity.User;
 
 import com.odel.identity.entity.RoleAssignment;
@@ -66,8 +68,6 @@ public class SessionController {
         cookies.clearSession(response);
         return ResponseEntity.noContent().build();
     }
-
-    public record ActiveRoleRequest(UUID roleAssignmentId) {}
 
     @PostMapping("/me/active-role")
     @Transactional

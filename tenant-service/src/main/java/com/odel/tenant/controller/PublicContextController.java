@@ -1,5 +1,7 @@
 package com.odel.tenant.controller;
 
+import com.odel.tenant.dto.PublicDtos.*;
+
 import com.odel.tenant.entity.Tenant;
 import com.odel.tenant.repository.TenantRepository;
 
@@ -34,11 +36,6 @@ public class PublicContextController {
         this.props = props;
         this.tenants = tenants;
     }
-
-    public record TenantBranding(UUID id, String slug, String name, String shortName, String primaryColor,
-                                 String accentColor, String logoUrl, String googleDomain, String status) {}
-
-    public record Context(String kind, TenantBranding tenant, boolean devSignIn) {}
 
     @GetMapping("/context")
     public Context context(HttpServletRequest request) {
