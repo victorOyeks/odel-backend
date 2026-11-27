@@ -102,7 +102,7 @@ public class StudentService {
     // ---------------------------------------------------------------- record (W-22b)
 
     public com.odel.student.dto.StudentDtos.Record record(UUID id) {
-        Student s = tx.execute(t -> students.findById(id).orElseThrow(ApiException::notFound));
+        Student s = tx.execute(t -> students.findInTenant(id).orElseThrow(ApiException::notFound));
         IdentityDtos.AccountView account = null;
         if (s.getUserId() != null) {
             try {
@@ -116,7 +116,7 @@ public class StudentService {
             List<HistoryItem> h = history.findByStudentIdOrderByCreatedAt(s.getId()).stream()
                     .map(c -> new HistoryItem(c.getCreatedAt(), c.getFromStatus() == null ? null : c.getFromStatus().name(), c.getToStatus().name(),
                             c.getReason(), new Person(c.getActorName() == null ? "System" : c.getActorName()))).toList();
-            ImportRef ref = s.getImportId() == null ? null : imports.findById(s.getImportId()).map(i -> new ImportRef(i.getId(), i.getFileName())).orElse(null);
+            ImportRef ref = s.getImportId() == null ? null : imports.findInTenant(s.getImportId()).map(i -> new ImportRef(i.getId(), i.getFileName())).orElse(null);
             return new com.odel.student.dto.StudentDtos.Record(s.getId(), s.getMatricNumber(), s.getSurname(), s.getFirstName(), s.getOtherNames(),
                     s.fullName(), s.getEmail(), s.getPhone(), s.getGender(), s.getDateOfBirth(), programme(s), s.getLevel(), s.getLevel() + "L", centre(s),
                     s.getEntrySession(), s.getStatus().name(), s.getStatus().label(),
@@ -166,7 +166,7 @@ public class StudentService {
             audit.record(new AuditService.Entry(tenant, actor, "STUDENT_ADDED", "student", id,
                     actor.name() + " added " + d.firstName() + " " + d.surname() + " (" + d.matricNumber() + ")", null, Map.of("matricNumber", d.matricNumber())));
             if (Boolean.TRUE.equals(in.sendWelcome()) && d.email() != null) {
-                welcome.sendOne(students.findById(id).orElseThrow(), actor);
+                welcome.sendOne(students.findInTenant(id).orElseThrow(), actor);
             }
         });
         return record(id);
@@ -177,7 +177,7 @@ public class StudentService {
     public com.odel.student.dto.StudentDtos.Record update(CurrentUser cu, UUID id, UpdateRequest in) {
         AuditService.Actor actor = actors.actor(cu);
         Map<String, String> f = new LinkedHashMap<>();
-        Student s = tx.execute(t -> students.findById(id).orElseThrow(ApiException::notFound));
+        Student s = tx.execute(t -> students.findInTenant(id).orElseThrow(ApiException::notFound));
         Map<String, Object> before = snapshot(s), after;
         String oldCentre = s.getCentreName();
 
@@ -261,7 +261,7 @@ public class StudentService {
     public com.odel.student.dto.StudentDtos.Record suspend(CurrentUser cu, UUID id, String reason) {
         AuditService.Actor actor = actors.actor(cu);
         tx.executeWithoutResult(t -> {
-            Student s = students.findById(id).orElseThrow(ApiException::notFound);
+            Student s = students.findInTenant(id).orElseThrow(ApiException::notFound);
             if (s.getStatus() == Student.Status.SUSPENDED) throw new ApiException(HttpStatus.CONFLICT, "already_suspended", "This student is already suspended.");
             String why = reason == null || reason.isBlank() ? "Suspended by the ODeL office" : "Suspended: " + reason.trim();
             change(s, Student.Status.SUSPENDED, why.length() > 300 ? why.substring(0, 300) : why, actor);
@@ -276,7 +276,7 @@ public class StudentService {
     public com.odel.student.dto.StudentDtos.Record reinstate(CurrentUser cu, UUID id) {
         AuditService.Actor actor = actors.actor(cu);
         tx.executeWithoutResult(t -> {
-            Student s = students.findById(id).orElseThrow(ApiException::notFound);
+            Student s = students.findInTenant(id).orElseThrow(ApiException::notFound);
             if (s.getStatus() != Student.Status.SUSPENDED) throw new ApiException(HttpStatus.CONFLICT, "not_suspended", "This student is not suspended.");
             Student.Status back = s.getStatusBeforeSuspension() != null ? s.getStatusBeforeSuspension()
                     : s.getActivatedAt() != null ? Student.Status.ACTIVE : Student.Status.IMPORTED;
@@ -292,26 +292,26 @@ public class StudentService {
     public void resendActivation(CurrentUser cu, UUID id) {
         AuditService.Actor actor = actors.actor(cu);
         tx.executeWithoutResult(t -> {
-            Student s = students.findById(id).orElseThrow(ApiException::notFound);
+            Student s = students.findInTenant(id).orElseThrow(ApiException::notFound);
             if (s.getStatus() == Student.Status.ACTIVE) throw new ApiException(HttpStatus.CONFLICT, "already_active", "This student has already activated the account.");
             if (s.getStatus() == Student.Status.SUSPENDED) throw new ApiException(HttpStatus.CONFLICT, "suspended", "Reinstate this student first.");
             if (s.getEmail() == null) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "no_email", "This student has no email on record. Add one first.");
             welcome.sendOne(s, actor);
-            audit.record(new AuditService.Entry(s.getTenantId(), actor, "ACTIVATION_RESENT", "student", s.getId(),
+            audit.record(new AuditService.Entry(s.getTenantId(), actor, "STUDENT_ACTIVATION_RESENT", "student", s.getId(),
                     actor.name() + " resent the activation message to " + s.displayName(), null, null));
         });
     }
 
     public void passwordReset(CurrentUser cu, UUID id) {
         AuditService.Actor actor = actors.actor(cu);
-        Student s = tx.execute(t -> students.findById(id).orElseThrow(ApiException::notFound));
+        Student s = tx.execute(t -> students.findInTenant(id).orElseThrow(ApiException::notFound));
         if (s.getStatus() != Student.Status.ACTIVE) {
             throw new ApiException(HttpStatus.CONFLICT, s.getStatus() == Student.Status.SUSPENDED ? "suspended" : "not_activated",
                     s.getStatus() == Student.Status.SUSPENDED ? "Reinstate this student first." : "This student has not activated the account yet. Resend the activation message instead.");
         }
         if (s.getEmail() == null) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "no_email", "This student has no email on record. Add one first.");
         identity.passwordReset(s.getUserId());
-        audit.record(new AuditService.Entry(s.getTenantId(), actor, "PASSWORD_RESET_SENT", "student", s.getId(),
+        audit.record(new AuditService.Entry(s.getTenantId(), actor, "STUDENT_PASSWORD_RESET_SENT", "student", s.getId(),
                 actor.name() + " sent " + s.displayName() + " a password reset code", null, null));
     }
 
@@ -340,18 +340,19 @@ public class StudentService {
                     "STUDENT_UPDATED", "student", s.getId(), s.displayName() + " updated their phone number",
                     old == null ? null : Map.of("phone", old), phone == null ? null : Map.of("phone", phone)));
         });
-        return tx.execute(t -> profile(students.findById(s.getId()).orElseThrow()));
+        return tx.execute(t -> profile(students.findInTenant(s.getId()).orElseThrow()));
     }
 
     // ---------------------------------------------------------------- internal
 
     public Summary summary() {
         return tx.execute(t -> {
-            long imported = students.count();
-            long welcomeSent = students.count((root, q, cb) -> cb.isNotNull(root.get("welcomeSentAt")));
+            long total = students.count();
             long active = students.countByStatus(Student.Status.ACTIVE);
             Instant last = imports.findFirstByStatusOrderByImportedAtDesc(StudentImport.Status.IMPORTED).map(StudentImport::getImportedAt).orElse(null);
-            return new Summary(imported, last, welcomeSent, active);
+            var w = bulk.welcomeCounts(TenantContext.require());
+            List<CentreCount> byCentre = students.countByCentre().stream().map(r -> new CentreCount((UUID) r[0], ((Number) r[1]).longValue())).toList();
+            return new Summary(total, active, last, new WelcomeCounts(w.sent(), w.failed(), w.notSent()), byCentre);
         });
     }
 

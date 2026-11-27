@@ -29,8 +29,8 @@ The session is the same Redis session as staff (cookie `ODEL_SESSION`, `GET /ses
 `roles` = one `STUDENT` role). Idle timeout is the same 30 minutes (design C: warning at 28, signed out at 30).
 After a student signs in the web goes to Home (`/`).
 
-Every code is 6 digits, emailed, valid **15 minutes**, can be re-sent after **60 seconds**, at most **5 codes an hour** per student
-(activation and reset codes count together). A code allows **3 wrong tries**; the third wrong try sends a fresh code automatically
+Every code is 6 digits, emailed, valid **15 minutes**, can be re-sent after **60 seconds** (counted per kind: an activation code
+never holds up a reset code), at most **5 codes an hour** per student (activation and reset codes count together). A code allows **3 wrong tries**; the third wrong try sends a fresh code automatically
 (when the hourly limit allows), as M-03b says ("2 tries left before we send a new one").
 
 ### `GET /auth/student/password-rules`
@@ -136,7 +136,7 @@ The CSV template to fill (header plus one example row), `Content-Disposition: at
 | `surname`, `first_name` | yes | `other_names` optional |
 | `programme_code` | yes | A programme code from Academic structure, e.g. `BSC-CSC-ODL` |
 | `level` | yes | `200`, `200L` or `Level 200`; must be a level the programme offers |
-| `study_centre` | yes | The centre's code, name or short name (`AKR`, `Akure Study Centre`, `Akure`) |
+| `study_centre` | yes | The centre's code or name, with or without "Study Centre" (`AKR`, `Akure Study Centre`, `Akure`) |
 | `email` | no | Needed for the welcome email and every code. Missing = warning; badly formed = error |
 | `phone` | no | Contact only. Nigerian numbers; a number that is not 11 digits (or +234 and 10) is left blank with a warning |
 | `gender`, `date_of_birth` | no | `M`/`F`; `YYYY-MM-DD` or `DD/MM/YYYY`. Unreadable values are left blank with a warning |
@@ -282,23 +282,23 @@ subject prefixed "Reminder: ".
 ## Internal (service to service, `X-Internal-Key`, never routed by the gateway)
 
 ### student-service provides
-- `GET /internal/students/summary` → `{"imported":3478,"lastImportAt":"…","welcomeSent":3290,"active":77}` (academic-service, setup checklist
-  steps 8 and 9: IMPORT is done when `imported > 0`; WELCOME when `welcomeSent > 0`).
+- `GET /internal/students/summary` (academic-service, setup checklist and centre counts) →
+  `{"total":3478,"active":120,"lastImportAt":"…","welcome":{"sent":3402,"failed":12,"notSent":64},"byCentre":[{"centreId":"uuid","students":34}]}`.
+  Step 8 is done when `total > 0`, step 9 when `welcome.notSent = 0`. `sent`: students whose welcome was handed to email (and did not fail);
+  `failed`: students not yet active with no email, or whose last welcome failed; `notSent`: not yet active, with an email, never sent.
+  `byCentre` uses academic-service's centre ids.
 - `GET /internal/students/contact?userId=` → `{"studentId","firstName","centre":{"name","phone"}}` (identity-service, for E-03 and the code emails).
 - `POST /internal/students/activated` `{"userId","activatedAt","consentVersion","consentAt"}` (identity-service, on activation).
 
-### student-service expects from academic-service
-`GET /internal/academic/lookup` (university in `X-Odel-Tenant-Id`):
-```json
-{"currentSession":{"id":"uuid","name":"2026/2027"},
- "programmes":[{"id":"uuid","code":"BSC-CSC-ODL","name":"B.Sc. Computer Science","levels":[100,200,300,400]}],
- "centres":[{"id":"uuid","code":"AKR","name":"Akure Study Centre","shortName":"Akure","phone":"0803 555 0117"}]}
-```
-Codes compared without regard to case. `levels` are the levels the programme admits students at. `shortName` and `phone` may be null;
-`currentSession` may be null before step 1 is done. Until academic-service is merged, student-service uses a stub
-(`ODEL_ACADEMIC_LOOKUP=stub`, the dev default in this branch) with Wesley-like data: programmes `BSC-CSC-ODL`, `BSC-IFT-ODL`
-(100–400), centres `AKR` Akure Study Centre, `LAG` Lagos (Ikeja), `ABJ` Abuja, `OND` Ondo (main campus), `IBD` Ibadan, session 2026/2027.
-Switch to `http` once academic-service serves the endpoint.
+### student-service uses from academic-service
+`GET /internal/academic/reference` (university in `X-Odel-Tenant-Id`, see `docs/api-b1-academic.md`):
+`{"currentSession":{"id","name","status"}|null,"sessions":[…],"programmes":[{"id","code","name","levels":[100,200,300,400],…}],"centres":[{"id","code","name"}]}`.
+Programme codes and centre codes or names are compared without regard to case; a centre also matches without "Study Centre"
+("Akure" finds "Akure Study Centre"), and lists show that shorter name. `ODEL_ACADEMIC_LOOKUP=stub` replaces the call with built-in
+Wesley-like data (programmes `BSC-CSC-ODL`, `BSC-IFT-ODL` 100–400; centres `AKR` Akure Study Centre, `LAG` Lagos (Ikeja),
+`ABJ` Abuja Study Centre, `OND` Ondo (main campus), `IBD` Ibadan Study Centre) for running student-service on its own.
+Centre phone numbers are not in the reference data yet, so `{centre_phone}` falls back to "the number on your admission letter"
+and E-03's `centre.phone` is null; add `phone` to the reference centres and both fill in.
 
 ### identity-service provides (to student-service)
 - `POST /internal/students/accounts` `{"accounts":[{"studentId","matricNumber","fullName","email","phone"}]}` → `{"accounts":[{"studentId","userId","created"}]}`;
@@ -309,8 +309,8 @@ Switch to `http` once academic-service serves the endpoint.
 - `POST /internal/students/accounts/{userId}/suspend` · `/reinstate` (suspend ends every session).
 - `POST /internal/students/accounts/{userId}/password-reset` → emails a reset code (W-22b).
 
-### tenant-service provides (new)
-- `GET /internal/tenants/{id}/portal` → `{"portalUrl":"https://wesley.odel-dev.oyeksglobal.com"}` (for `{activation_link}`).
+### tenant-service
+- `GET /internal/tenants/{id}` carries `portalUrl` (the change from the academic branch), used for `{activation_link}` and the office's reset link.
 
 ### notification-service provides (new)
 - `POST /internal/messages/bulk` `{"messages":[<same as POST /internal/messages>]}` → `{"ids":["uuid or null", …]}` in the same order.
@@ -319,7 +319,8 @@ Switch to `http` once academic-service serves the endpoint.
 - `GET /api/v1/dev/emails?to=` (dev only): optional filter by recipient.
 
 ## Audit actions added
+All start with `STUDENT` or `WELCOME_`, so the university's audit log can group them (sign-out is B0's `SIGN_OUT`).
 student-service: `STUDENTS_IMPORTED`, `STUDENT_ADDED`, `STUDENT_UPDATED`, `STUDENT_CENTRE_CHANGED`, `STUDENT_SUSPENDED`, `STUDENT_REINSTATED`,
-`WELCOME_TEMPLATE_UPDATED`, `WELCOME_TEST_SENT`, `WELCOME_SENT`, `ACTIVATION_RESENT`, `PASSWORD_RESET_SENT`.
-identity-service: `ACTIVATION_CODE_SENT`, `STUDENT_ACTIVATED`, `CONSENT_RECORDED`, `SIGN_IN`, `SIGN_IN_FAILED`, `ACCOUNT_LOCKED`,
-`PASSWORD_RESET_CODE_SENT`, `PASSWORD_RESET`, `SIGN_OUT`, `ACCOUNT_SUSPENDED`, `ACCOUNT_REINSTATED`.
+`STUDENT_ACTIVATION_RESENT`, `STUDENT_PASSWORD_RESET_SENT`, `WELCOME_TEMPLATE_UPDATED`, `WELCOME_TEST_SENT`, `WELCOME_SENT`.
+identity-service: `STUDENT_ACTIVATION_CODE_SENT`, `STUDENT_ACTIVATION_FAILED`, `STUDENT_CODE_FAILED`, `STUDENT_ACTIVATED`, `STUDENT_ACTIVATED_CONSENT`,
+`STUDENT_SIGN_IN`, `STUDENT_SIGN_IN_FAILED`, `STUDENT_SIGN_IN_LOCKED`, `STUDENT_PASSWORD_RESET_CODE_SENT`, `STUDENT_PASSWORD_RESET_FAILED`, `STUDENT_PASSWORD_RESET`.

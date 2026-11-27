@@ -8,7 +8,7 @@ import java.util.UUID;
  * with the levels they admit, the study centres, and the current session.
  */
 public record AcademicLookup(Session currentSession, List<Programme> programmes, List<Centre> centres) {
-    public record Session(UUID id, String name) {}
+    public record Session(UUID id, String name, String status) {}
 
     public record Programme(UUID id, String code, String name, List<Integer> levels) {}
 

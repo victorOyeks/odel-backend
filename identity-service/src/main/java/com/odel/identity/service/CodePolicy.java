@@ -23,14 +23,17 @@ public final class CodePolicy {
         public boolean allowed() { return verdict == SendVerdict.OK; }
     }
 
-    /** May another code be sent now, given when the earlier ones went (any order, any age)? */
-    public static SendDecision canSend(List<Instant> sentAt, Instant now) {
+    /**
+     * May another code be sent now? The hourly limit counts every code the student was sent (any order, any age);
+     * the 60-second wait counts from the last code of the same kind (activation or reset), so finishing activation never
+     * blocks an immediate reset.
+     */
+    public static SendDecision canSend(List<Instant> sentAt, Instant lastOfThisKind, Instant now) {
         List<Instant> recent = sentAt.stream().filter(t -> t.isAfter(now.minus(WINDOW))).sorted().toList();
-        if (!recent.isEmpty()) {
-            Instant last = recent.get(recent.size() - 1);
-            long since = Duration.between(last, now).toSeconds();
+        if (lastOfThisKind != null) {
+            long since = Duration.between(lastOfThisKind, now).toSeconds();
             if (since < RESEND_AFTER.toSeconds()) {
-                return new SendDecision(SendVerdict.TOO_SOON, RESEND_AFTER.toSeconds() - since, MAX_SENDS_PER_HOUR - recent.size());
+                return new SendDecision(SendVerdict.TOO_SOON, RESEND_AFTER.toSeconds() - since, Math.max(0, MAX_SENDS_PER_HOUR - recent.size()));
             }
         }
         if (recent.size() >= MAX_SENDS_PER_HOUR) {

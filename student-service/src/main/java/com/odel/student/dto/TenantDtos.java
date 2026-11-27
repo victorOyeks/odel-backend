@@ -7,7 +7,5 @@ public final class TenantDtos {
     private TenantDtos() {}
 
     public record TenantView(UUID id, String kind, String slug, String name, String shortName, String googleDomain, String status,
-                             String primaryColor, String accentColor) {}
-
-    public record PortalView(String portalUrl) {}
+                             String primaryColor, String accentColor, String portalUrl) {}
 }

@@ -89,7 +89,56 @@ public class WelcomeRepository {
         return n == null ? 0 : n;
     }
 
-    // ---- the worker ----
+    // ---- the worker (no Hibernate session here: it runs for every university, so the university is explicit) ----
+
+    public List<com.odel.student.entity.Student> students(UUID tenantId, Collection<UUID> ids) {
+        if (ids.isEmpty()) return List.of();
+        return jdbc.query("""
+                select id, tenant_id, user_id, matric_number, surname, first_name, email, programme_name, level, centre_code, centre_name,
+                       entry_session, status from students where tenant_id = ? and id = any (?)""", (rs, i) -> {
+            var s = new com.odel.student.entity.Student();
+            s.setId(rs.getObject(1, UUID.class));
+            s.setTenantId(rs.getObject(2, UUID.class));
+            s.setUserId(rs.getObject(3, UUID.class));
+            s.setMatricNumber(rs.getString(4));
+            s.setSurname(rs.getString(5));
+            s.setFirstName(rs.getString(6));
+            s.setEmail(rs.getString(7));
+            s.setProgrammeName(rs.getString(8));
+            s.setLevel(rs.getInt(9));
+            s.setCentreCode(rs.getString(10));
+            s.setCentreName(rs.getString(11));
+            s.setEntrySession(rs.getString(12));
+            s.setStatus(com.odel.student.entity.Student.Status.valueOf(rs.getString(13)));
+            return s;
+        }, tenantId, ids.toArray(new UUID[0]));
+    }
+
+    public record SendText(UUID id, String kind, String subject, String body, UUID requestedBy, String requestedByName) {}
+
+    public Map<UUID, SendText> sendTexts(UUID tenantId, Collection<UUID> ids) {
+        Map<UUID, SendText> m = new HashMap<>();
+        if (ids.isEmpty()) return m;
+        jdbc.query("select id, kind, subject, body, requested_by, requested_by_name from welcome_sends where tenant_id = ? and id = any (?)",
+                rs -> { m.put(rs.getObject(1, UUID.class), new SendText(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4),
+                        rs.getObject(5, UUID.class), rs.getString(6))); }, tenantId, ids.toArray(new UUID[0]));
+        return m;
+    }
+
+    /** Starts the reminder of a send: a new REMINDER send to its students still not active. */
+    public void startReminder(UUID tenantId, UUID originalSendId, Instant now) {
+        SendText o = sendTexts(tenantId, List.of(originalSendId)).get(originalSendId);
+        if (o == null) return;
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                insert into welcome_sends (id, tenant_id, kind, status, subject, body, parent_send_id, total_students, skipped_active,
+                    requested_by, requested_by_name, started_at) values (?, ?, 'REMINDER', 'RUNNING', ?, ?, ?, 0, 0, ?, ?, ?)""",
+                id, tenantId, o.subject(), o.body(), originalSendId, o.requestedBy(), o.requestedByName(), Timestamp.from(now));
+        int n = addReminders(tenantId, id, originalSendId, now);
+        jdbc.update("update welcome_sends set total_students = ? where id = ?", n, id);
+        jdbc.update("update welcome_sends set reminder_sent_at = ? where id = ?", Timestamp.from(now), originalSendId);
+    }
+
 
     public record Open(UUID id, UUID tenantId, UUID sendId, UUID studentId, String email, UUID messageId) {}
 

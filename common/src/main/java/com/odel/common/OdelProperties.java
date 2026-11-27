@@ -29,7 +29,7 @@ public record OdelProperties(
         Bootstrap bootstrap) {
 
     /** Where each service listens, for /internal/** calls. */
-    public record Services(String identity, String tenant, String notification) {}
+    public record Services(String identity, String tenant, String notification, String academic, String students) {}
 
     public record Session(Duration idleTimeout, Duration signInTimeout, Duration absoluteTimeout,
                           boolean secureCookies, int trustDeviceDays) {}

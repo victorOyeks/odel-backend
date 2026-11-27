@@ -28,16 +28,7 @@ springdoc:
 odel:
   student:
     # Programme and centre codes come from academic-service (GET /internal/academic/lookup).
-    # stub = built-in Wesley-like data, until academic-service is merged; http = ask academic-service.
+    # http = ask academic-service (GET /internal/academic/reference); stub = built-in Wesley-like data, for running this
+    # service without academic-service.
     academic-lookup: ${ODEL_ACADEMIC_LOOKUP:http}
-    academic-url: ${ODEL_ACADEMIC_URL:http://127.0.0.1:9304}
     welcome-worker: ${ODEL_STUDENT_WELCOME_WORKER:true}
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-odel:
-  student:
-    academic-lookup: ${ODEL_ACADEMIC_LOOKUP:stub}

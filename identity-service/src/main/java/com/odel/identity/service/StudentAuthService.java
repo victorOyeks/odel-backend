@@ -24,6 +24,7 @@ import com.odel.identity.dto.StudentAuthDtos.StudentContact;
 import com.odel.identity.dto.StudentAuthDtos.Verified;
 import com.odel.identity.User;
 import com.odel.identity.UserRepository;
+import com.odel.identity.repository.StudentUserRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -54,6 +55,7 @@ public class StudentAuthService {
     private static final BCryptPasswordEncoder BCRYPT = new BCryptPasswordEncoder(10);
 
     private final UserRepository users;
+    private final StudentUserRepository byId;
     private final RoleAssignmentRepository roles;
     private final StudentCodeStore store;
     private final StudentServiceClient students;
@@ -67,10 +69,11 @@ public class StudentAuthService {
     private final OdelProperties props;
     private final Clock clock;
 
-    public StudentAuthService(UserRepository users, RoleAssignmentRepository roles, StudentCodeStore store, StudentServiceClient students,
+    public StudentAuthService(UserRepository users, StudentUserRepository byId, RoleAssignmentRepository roles, StudentCodeStore store, StudentServiceClient students,
                               TenantInfo.Client tenants, InternalClient internal, SessionStore sessions, SessionCookies cookies,
                               SignInService signIn, AuditService audit, TransactionTemplate tx, OdelProperties props, Clock clock) {
         this.users = users;
+        this.byId = byId;
         this.roles = roles;
         this.store = store;
         this.students = students;
@@ -92,7 +95,7 @@ public class StudentAuthService {
         TenantInfo tenant = university();
         User user = tx.execute(s -> findStudent(login).orElse(null));
         if (user == null) {
-            audit(tenant.id(), null, login, purpose == Purpose.ACTIVATION ? "ACTIVATION_FAILED" : "PASSWORD_RESET_FAILED",
+            audit(tenant.id(), null, login, purpose == Purpose.ACTIVATION ? "STUDENT_ACTIVATION_FAILED" : "STUDENT_PASSWORD_RESET_FAILED",
                     "No student with " + clean(login) + " (" + (purpose == Purpose.ACTIVATION ? "activation" : "password reset") + ")", Map.of("reason", "not_found"));
             if (purpose == Purpose.ACTIVATION) {
                 throw new ApiException(HttpStatus.NOT_FOUND, "matric_not_found",
@@ -121,23 +124,23 @@ public class StudentAuthService {
         String flowId = store.flowFor(purpose, tenant.id(), user.getId());
         Instant now = clock.instant();
         Optional<CodePolicy.Stored> live = store.code(purpose, user.getId()).filter(c -> now.isBefore(c.expiresAt()) && c.wrongTries() < CodePolicy.MAX_TRIES);
-        CodePolicy.SendDecision decision = CodePolicy.canSend(store.sends(user.getId(), now), now);
+        CodePolicy.SendDecision decision = CodePolicy.canSend(store.sends(user.getId(), now), lastSent(purpose, user.getId()), now);
         if (live.isPresent() && (codeAlreadySent || decision.verdict() == CodePolicy.SendVerdict.TOO_SOON)) {
             return sentView(flowId, user, live.get(), false, decision, centre, contact, now);
         }
         refuseIfLimited(decision);
         CodePolicy.Stored stored = send(purpose, user, tenant, contact, now, false);
-        return sentView(flowId, user, stored, true, CodePolicy.canSend(store.sends(user.getId(), now), now), centre, contact, now);
+        return sentView(flowId, user, stored, true, CodePolicy.canSend(store.sends(user.getId(), now), lastSent(purpose, user.getId()), now), centre, contact, now);
     }
 
     /** "Resend code". */
     public CodeSent resend(Purpose purpose, String flowId) {
         TenantInfo tenant = university();
         StudentCodeStore.Flow flow = flow(purpose, flowId, tenant);
-        User user = tx.execute(s -> users.findById(flow.userId()).orElse(null));
+        User user = tx.execute(s -> byId.findInTenant(flow.userId()).orElse(null));
         if (user == null || user.getStatus() == User.Status.SUSPENDED || user.getEmail() == null) throw expired();
         Instant now = clock.instant();
-        CodePolicy.SendDecision decision = CodePolicy.canSend(store.sends(user.getId(), now), now);
+        CodePolicy.SendDecision decision = CodePolicy.canSend(store.sends(user.getId(), now), lastSent(purpose, user.getId()), now);
         if (decision.verdict() == CodePolicy.SendVerdict.TOO_SOON) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "resend_too_soon",
                     "Wait " + decision.retryInSeconds() + " seconds before asking for another code.", null, Map.of("retryInSeconds", decision.retryInSeconds()));
@@ -146,14 +149,14 @@ public class StudentAuthService {
         Optional<StudentContact> contact = students.contact(user.getId());
         CodePolicy.Stored stored = send(purpose, user, tenant, contact, now, false);
         CentreView centre = contact.map(StudentContact::centre).filter(c -> c != null && c.name() != null).orElse(null);
-        return sentView(flowId, user, stored, true, CodePolicy.canSend(store.sends(user.getId(), now), now), centre, contact, now);
+        return sentView(flowId, user, stored, true, CodePolicy.canSend(store.sends(user.getId(), now), lastSent(purpose, user.getId()), now), centre, contact, now);
     }
 
     /** M-03 / M-03R: the typed code. */
     public Verified verify(Purpose purpose, String flowId, String code) {
         TenantInfo tenant = university();
         StudentCodeStore.Flow flow = flow(purpose, flowId, tenant);
-        User user = tx.execute(s -> users.findById(flow.userId()).orElse(null));
+        User user = tx.execute(s -> byId.findInTenant(flow.userId()).orElse(null));
         if (user == null) throw expired();
         if (user.getStatus() == User.Status.SUSPENDED) throw suspended(tenant);
         Instant now = clock.instant();
@@ -168,15 +171,15 @@ public class StudentAuthService {
             case WRONG -> {
                 CodePolicy.Stored s = stored.get();
                 store.putCode(purpose, user.getId(), new CodePolicy.Stored(s.hash(), s.sentAt(), s.expiresAt(), s.wrongTries() + 1));
-                audit(tenant.id(), user, null, "CODE_FAILED", user.getFullName() + " typed a wrong code", Map.of("attemptsLeft", check.attemptsLeft()));
+                audit(tenant.id(), user, null, "STUDENT_CODE_FAILED", user.getFullName() + " typed a wrong code", Map.of("attemptsLeft", check.attemptsLeft()));
                 String tries = check.attemptsLeft() == 1 ? "1 try" : check.attemptsLeft() + " tries";
                 throw new ApiException(HttpStatus.BAD_REQUEST, "wrong_code", "That code is not right. " + tries + " left before we send a new one.",
                         null, Map.of("attemptsLeft", check.attemptsLeft()));
             }
             case USED_UP -> {
                 store.deleteCode(purpose, user.getId());
-                audit(tenant.id(), user, null, "CODE_FAILED", user.getFullName() + " typed a wrong code three times", Map.of("attemptsLeft", 0));
-                CodePolicy.SendDecision decision = CodePolicy.canSend(store.sends(user.getId(), now), now);
+                audit(tenant.id(), user, null, "STUDENT_CODE_FAILED", user.getFullName() + " typed a wrong code three times", Map.of("attemptsLeft", 0));
+                CodePolicy.SendDecision decision = CodePolicy.canSend(store.sends(user.getId(), now), lastSent(purpose, user.getId()), now);
                 if (decision.allowed() && user.getEmail() != null) {
                     send(purpose, user, tenant, students.contact(user.getId()), now, false);
                     throw new ApiException(HttpStatus.BAD_REQUEST, "new_code_sent", "That code was wrong three times, so we sent you a new one.",
@@ -207,7 +210,7 @@ public class StudentAuthService {
         if (v.passwordHash() == null) throw new ApiException(HttpStatus.CONFLICT, "password_missing", "Create your password first.");
         String consentVersion = version == null || version.isBlank() ? PRIVACY_VERSION : version.trim();
         SessionView view = tx.execute(s -> {
-            User user = users.findById(v.userId()).orElseThrow(this::expired);
+            User user = byId.findInTenant(v.userId()).orElseThrow(this::expired);
             if (user.getStatus() == User.Status.SUSPENDED) throw suspended(tenants.get(v.tenantId()));
             if (user.getPasswordHash() != null) throw new ApiException(HttpStatus.CONFLICT, "already_active",
                     "This account is already active. Sign in with your password, or reset it if you have forgotten it.");
@@ -223,7 +226,7 @@ public class StudentAuthService {
             user.setUpdatedAt(now);
             users.save(user);
             audit(v.tenantId(), user, null, "STUDENT_ACTIVATED", user.getFullName() + " (" + user.getMatricNumber() + ") activated the account", null);
-            audit(v.tenantId(), user, null, "CONSENT_RECORDED", user.getFullName() + " accepted the privacy notice (version " + consentVersion + ")",
+            audit(v.tenantId(), user, null, "STUDENT_ACTIVATED_CONSENT", user.getFullName() + " accepted the privacy notice (version " + consentVersion + ")",
                     Map.of("version", consentVersion, "at", now.toString()));
             students.activated(user.getId(), now, consentVersion, now);
             return openSession(user, keep, response, "matric number and emailed code");
@@ -242,7 +245,7 @@ public class StudentAuthService {
         if (!problems.isEmpty()) throw ApiException.fields(HttpStatus.BAD_REQUEST, "weak_password", problems.values().iterator().next(), problems);
         String hash = BCRYPT.encode(password);
         SessionView view = tx.execute(s -> {
-            User user = users.findById(v.userId()).orElseThrow(this::expired);
+            User user = byId.findInTenant(v.userId()).orElseThrow(this::expired);
             if (user.getStatus() == User.Status.SUSPENDED) throw suspended(tenants.get(v.tenantId()));
             Instant now = clock.instant();
             user.setPasswordHash(hash);
@@ -252,7 +255,7 @@ public class StudentAuthService {
             user.setUpdatedAt(now);
             users.save(user);
             sessions.deleteAllForUser(user.getId());
-            audit(v.tenantId(), user, null, "PASSWORD_RESET", user.getFullName() + " chose a new password with an emailed code; other sessions ended", null);
+            audit(v.tenantId(), user, null, "STUDENT_PASSWORD_RESET", user.getFullName() + " chose a new password with an emailed code; other sessions ended", null);
             return openSession(user, keep, response, "new password");
         });
         store.deleteToken(token);
@@ -263,13 +266,13 @@ public class StudentAuthService {
     /** W-22b "Send her a reset code by email": a code plus a link to the reset screen. */
     public void officeReset(UUID userId) {
         TenantInfo tenant = tenants.get(TenantContext.require());
-        User user = tx.execute(s -> users.findById(userId).filter(User::isStudent).orElseThrow(ApiException::notFound));
+        User user = tx.execute(s -> byId.findInTenant(userId).filter(User::isStudent).orElseThrow(ApiException::notFound));
         if (user.getPasswordHash() == null) throw new ApiException(HttpStatus.CONFLICT, "not_activated",
                 "This student has not activated the account yet. Resend the activation message instead.");
         if (user.getEmail() == null) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "no_email",
                 "This student has no email on record. Add one first.");
         Instant now = clock.instant();
-        refuseIfLimited(CodePolicy.canSend(store.sends(user.getId(), now), now));
+        refuseIfLimited(CodePolicy.canSend(store.sends(user.getId(), now), lastSent(Purpose.RESET, user.getId()), now));
         send(Purpose.RESET, user, tenant, students.contact(user.getId()), now, true);
     }
 
@@ -283,11 +286,11 @@ public class StudentAuthService {
         Outcome out = tx.execute(s -> {
             User user = findStudent(login).orElse(null);
             if (user == null) {
-                audit(tenant.id(), null, login, "SIGN_IN_FAILED", "Student sign-in refused for " + clean(login) + " (not_found)", Map.of("reason", "not_found"));
+                audit(tenant.id(), null, login, "STUDENT_SIGN_IN_FAILED", "Student sign-in refused for " + clean(login) + " (not_found)", Map.of("reason", "not_found"));
                 return new Outcome(null, notFound());
             }
             if (user.getStatus() == User.Status.SUSPENDED) {
-                audit(tenant.id(), user, null, "SIGN_IN_FAILED", user.getFullName() + " could not sign in (suspended)", Map.of("reason", "suspended"));
+                audit(tenant.id(), user, null, "STUDENT_SIGN_IN_FAILED", user.getFullName() + " could not sign in (suspended)", Map.of("reason", "suspended"));
                 return new Outcome(null, suspended(tenant));
             }
             if (user.getPasswordHash() == null) {
@@ -302,9 +305,9 @@ public class StudentAuthService {
                 user.setFailedSignIns(next.failed());
                 user.setLockedUntil(next.lockedUntil());
                 users.save(user);
-                audit(tenant.id(), user, null, "SIGN_IN_FAILED", user.getFullName() + " typed a wrong password", Map.of("reason", "wrong_password", "failed", next.failed()));
+                audit(tenant.id(), user, null, "STUDENT_SIGN_IN_FAILED", user.getFullName() + " typed a wrong password", Map.of("reason", "wrong_password", "failed", next.failed()));
                 if (next.locked(now)) {
-                    audit(tenant.id(), user, null, "ACCOUNT_LOCKED", user.getFullName() + ": sign-in paused for 15 minutes after five wrong passwords",
+                    audit(tenant.id(), user, null, "STUDENT_SIGN_IN_LOCKED", user.getFullName() + ": sign-in paused for 15 minutes after five wrong passwords",
                             Map.of("lockedUntil", next.lockedUntil().toString()));
                     return new Outcome(null, locked(next, now));
                 }
@@ -344,7 +347,7 @@ public class StudentAuthService {
         user.setLastSignInAt(now);
         user.setUpdatedAt(now);
         users.save(user);
-        audit(user.getTenantId(), user, null, "SIGN_IN", user.getFullName() + " signed in (" + method + ")", null);
+        audit(user.getTenantId(), user, null, "STUDENT_SIGN_IN", user.getFullName() + " signed in (" + method + ")", null);
         return signIn.view(Tokens.sha256(token), data);
     }
 
@@ -361,7 +364,7 @@ public class StudentAuthService {
         String key = purpose == Purpose.ACTIVATION ? "student.activation_code" : "student.password_reset_code";
         if (byOffice) {
             key = "student.password_reset_by_office";
-            String portal = internal.get(InternalClient.Service.TENANT, "/internal/tenants/" + tenant.id() + "/portal", Map.class).get("portalUrl").toString();
+            String portal = String.valueOf(internal.get(InternalClient.Service.TENANT, "/internal/tenants/" + tenant.id(), Map.class).get("portalUrl"));
             vars.put("resetLink", portal + "/reset-password?login=" + java.net.URLEncoder.encode(user.getMatricNumber(), java.nio.charset.StandardCharsets.UTF_8) + "&sent=1");
         }
         Map<String, Object> look = new HashMap<>();
@@ -375,7 +378,7 @@ public class StudentAuthService {
         msg.put("vars", vars);
         msg.put("tenant", look);
         internal.post(InternalClient.Service.NOTIFICATION, "/internal/messages", msg, Map.class);
-        String action = purpose == Purpose.ACTIVATION ? "ACTIVATION_CODE_SENT" : "PASSWORD_RESET_CODE_SENT";
+        String action = purpose == Purpose.ACTIVATION ? "STUDENT_ACTIVATION_CODE_SENT" : "STUDENT_PASSWORD_RESET_CODE_SENT";
         String summary = (purpose == Purpose.ACTIVATION ? "Activation code" : "Password reset code") + " emailed to " + user.getFullName()
                 + " (" + CodePolicy.mask(user.getEmail()) + ")" + (byOffice ? " by the ODeL office" : "");
         tx.executeWithoutResult(s -> audit(tenant.id(), user, null, action, summary, null));
@@ -389,6 +392,10 @@ public class StudentAuthService {
         String first = contact.map(StudentContact::firstName).filter(f -> f != null && !f.isBlank()).orElse(user.firstName());
         return new CodeSent(flowId, CodePolicy.mask(user.getEmail()), sent, expiresIn, resendIn, Math.max(0, after.sendsLeftAfter() + (after.allowed() ? 1 : 0)),
                 new StudentBrief(first, user.getFullName(), user.getMatricNumber()), centre);
+    }
+
+    private Instant lastSent(Purpose purpose, UUID userId) {
+        return store.code(purpose, userId).map(CodePolicy.Stored::sentAt).orElse(null);
     }
 
     private void refuseIfLimited(CodePolicy.SendDecision d) {

@@ -54,7 +54,13 @@ public final class StudentDtos {
 
     // ---- internal ----
 
-    public record Summary(long imported, Instant lastImportAt, long welcomeSent, long active) {}
+    /** For academic-service's setup checklist: step 8 done when total > 0, step 9 when welcome.notSent = 0. */
+    public record Summary(long total, long active, Instant lastImportAt, WelcomeCounts welcome, List<CentreCount> byCentre) {}
+
+    /** sent: handed to email; failed: not active and no email, or the email failed; notSent: not active, has an email, never sent. */
+    public record WelcomeCounts(long sent, long failed, long notSent) {}
+
+    public record CentreCount(UUID centreId, long students) {}
 
     public record ContactCentre(String name, String phone) {}
 

@@ -79,10 +79,9 @@ public class WelcomeWorker {
             Map<UUID, List<WelcomeRepository.Open>> byTenant = open.stream().collect(Collectors.groupingBy(WelcomeRepository.Open::tenantId));
             Instant now = clock.instant();
             byTenant.forEach((tenant, list) -> TenantContext.runAs(tenant, () -> {
-                Map<UUID, Student> found = students.findAllById(list.stream().map(WelcomeRepository.Open::studentId).toList()).stream()
+                Map<UUID, Student> found = repo.students(tenant, list.stream().map(WelcomeRepository.Open::studentId).toList()).stream()
                         .collect(Collectors.toMap(Student::getId, x -> x));
-                Map<UUID, WelcomeSend> sendRows = sends.findAllById(list.stream().map(WelcomeRepository.Open::sendId).distinct().toList()).stream()
-                        .collect(Collectors.toMap(WelcomeSend::getId, x -> x));
+                Map<UUID, WelcomeRepository.SendText> sendRows = repo.sendTexts(tenant, list.stream().map(WelcomeRepository.Open::sendId).distinct().toList());
                 AcademicLookup lookup = academic.lookup();
                 String portal = tenants.portalUrl();
                 NotificationDtos.TenantLook look = tenants.look();
@@ -91,7 +90,7 @@ public class WelcomeWorker {
                 List<Object[]> updates = new ArrayList<>();
                 for (WelcomeRepository.Open d : list) {
                     Student st = found.get(d.studentId());
-                    WelcomeSend send = sendRows.get(d.sendId());
+                    WelcomeRepository.SendText send = sendRows.get(d.sendId());
                     if (st == null || send == null || st.getEmail() == null) {
                         updates.add(new Object[]{"SKIPPED_NO_EMAIL", null, "No email on record", Timestamp.from(now), d.id()});
                         continue;
@@ -100,8 +99,8 @@ public class WelcomeWorker {
                         updates.add(new Object[]{"FAILED", null, st.getStatus() == Student.Status.ACTIVE ? "Already active" : "Suspended", Timestamp.from(now), d.id()});
                         continue;
                     }
-                    String subject = send.getKind() == WelcomeSend.Kind.REMINDER ? "Reminder: " + send.getSubject() : send.getSubject();
-                    messages.add(welcome.message(st, subject, send.getBody(), lookup, portal, look));
+                    String subject = "REMINDER".equals(send.kind()) ? "Reminder: " + send.subject() : send.subject();
+                    messages.add(welcome.message(st, subject, send.body(), lookup, portal, look));
                     going.add(d);
                 }
                 List<UUID> ids = notifications.sendAll(messages);
@@ -148,26 +147,7 @@ public class WelcomeWorker {
     void reminders() {
         tx.executeWithoutResult(s -> {
             Instant now = clock.instant();
-            for (WelcomeRepository.Due due : repo.remindersDue(now)) {
-                TenantContext.runAs(due.tenantId(), () -> {
-                    WelcomeSend original = sends.findById(due.id()).orElseThrow();
-                    WelcomeSend r = new WelcomeSend();
-                    r.setId(UUID.randomUUID());
-                    r.setKind(WelcomeSend.Kind.REMINDER);
-                    r.setStatus(WelcomeSend.Status.RUNNING);
-                    r.setSubject(original.getSubject());
-                    r.setBody(original.getBody());
-                    r.setParentSendId(original.getId());
-                    r.setRequestedBy(original.getRequestedBy());
-                    r.setRequestedByName(original.getRequestedByName());
-                    r.setStartedAt(now);
-                    sends.saveAndFlush(r);
-                    r.setTotalStudents(repo.addReminders(due.tenantId(), r.getId(), original.getId(), now));
-                    sends.save(r);
-                    original.setReminderSentAt(now);
-                    sends.save(original);
-                });
-            }
+            for (WelcomeRepository.Due due : repo.remindersDue(now)) repo.startReminder(due.tenantId(), due.id(), now);
         });
     }
 

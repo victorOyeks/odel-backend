@@ -7,6 +7,7 @@ import com.odel.common.security.SessionStore;
 import com.odel.common.tenancy.TenantContext;
 import com.odel.identity.User;
 import com.odel.identity.UserRepository;
+import com.odel.identity.repository.StudentUserRepository;
 import com.odel.identity.dto.StudentAccountDtos.*;
 import com.odel.identity.service.StudentAuthService;
 import org.springframework.http.HttpStatus;
@@ -26,13 +27,15 @@ import java.util.*;
 public class StudentAccountsInternalController {
     private final JdbcTemplate jdbc;
     private final UserRepository users;
+    private final StudentUserRepository byId;
     private final SessionStore sessions;
     private final StudentAuthService auth;
     private final Clock clock;
 
-    public StudentAccountsInternalController(JdbcTemplate jdbc, UserRepository users, SessionStore sessions, StudentAuthService auth, Clock clock) {
+    public StudentAccountsInternalController(JdbcTemplate jdbc, UserRepository users, StudentUserRepository byId, SessionStore sessions, StudentAuthService auth, Clock clock) {
         this.jdbc = jdbc;
         this.users = users;
+        this.byId = byId;
         this.sessions = sessions;
         this.auth = auth;
         this.clock = clock;
@@ -169,7 +172,7 @@ public class StudentAccountsInternalController {
     }
 
     private User student(UUID userId) {
-        return users.findById(userId).filter(User::isStudent).orElseThrow(ApiException::notFound);
+        return byId.findInTenant(userId).filter(User::isStudent).orElseThrow(ApiException::notFound);
     }
 
     private static boolean blank(String s) {

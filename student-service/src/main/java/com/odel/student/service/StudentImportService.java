@@ -246,7 +246,7 @@ public class StudentImportService {
     }
 
     private StudentImport find(UUID id) {
-        return tx.execute(s -> imports.findById(id).orElseThrow(ApiException::notFound));
+        return tx.execute(s -> imports.findInTenant(id).orElseThrow(ApiException::notFound));
     }
 
     private static String nz(String s) {

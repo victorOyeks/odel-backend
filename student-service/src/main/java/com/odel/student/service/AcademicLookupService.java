@@ -26,7 +26,10 @@ public class AcademicLookupService {
         UUID t = TenantContext.require();
         Cached c = cache.get(t);
         if (c != null && System.currentTimeMillis() - c.at() < 30_000) return c.lookup();
-        AcademicLookup l = directory.lookup();
+        AcademicLookup raw = directory.lookup();
+        // academic-service gives a centre's name only; "Akure" (for "Akure Study Centre") is what lists show.
+        AcademicLookup l = new AcademicLookup(raw.currentSession(), raw.programmes(), raw.centres().stream()
+                .map(x -> x.shortName() != null ? x : new AcademicLookup.Centre(x.id(), x.code(), x.name(), shortName(x.name()), x.phone())).toList());
         cache.put(t, new Cached(l, System.currentTimeMillis()));
         return l;
     }
@@ -45,8 +48,16 @@ public class AcademicLookupService {
     public Optional<AcademicLookup.Centre> centre(String codeOrName) {
         if (codeOrName == null) return Optional.empty();
         String k = codeOrName.trim().toLowerCase(Locale.ROOT);
-        return lookup().centres().stream().filter(c -> c.code().equalsIgnoreCase(k) || (c.name() != null && c.name().equalsIgnoreCase(k))
+        String plain = k.replaceAll("\\s*(study\\s+)?cent(re|er)\\s*$", "").trim();
+        return lookup().centres().stream().filter(c -> c.code().equalsIgnoreCase(k) || (c.name() != null && (c.name().equalsIgnoreCase(k)
+                || c.name().toLowerCase(Locale.ROOT).replaceAll("\\s*(study\\s+)?cent(re|er)\\s*$", "").trim().equals(plain)))
                 || (c.shortName() != null && c.shortName().equalsIgnoreCase(k))).findFirst();
+    }
+
+    static String shortName(String name) {
+        if (name == null) return null;
+        String s = name.replaceAll("(?i)\\s*(study\\s+)?cent(re|er)\\s*$", "").trim();
+        return s.isEmpty() ? name : s;
     }
 
     public String sessionName() {

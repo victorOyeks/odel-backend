@@ -67,6 +67,19 @@ public class StudentBulkRepository {
         jdbc.batchUpdate("update students set user_id = ? where id = ? and tenant_id = ? and user_id is null", rows);
     }
 
+    public record WelcomeCounts(long sent, long failed, long notSent) {}
+
+    public WelcomeCounts welcomeCounts(UUID tenantId) {
+        return jdbc.queryForObject("""
+                with latest as (select distinct on (d.student_id) d.student_id, d.status from welcome_deliveries d
+                                where d.tenant_id = ? order by d.student_id, d.updated_at desc)
+                select count(*) filter (where s.welcome_sent_at is not null and coalesce(l.status, '') <> 'FAILED'),
+                       count(*) filter (where s.status in ('IMPORTED', 'INVITED') and (s.email is null or l.status = 'FAILED')),
+                       count(*) filter (where s.status in ('IMPORTED', 'INVITED') and s.email is not null and s.welcome_sent_at is null)
+                from students s left join latest l on l.student_id = s.id where s.tenant_id = ?""",
+                (rs, i) -> new WelcomeCounts(rs.getLong(1), rs.getLong(2), rs.getLong(3)), tenantId, tenantId);
+    }
+
     public record StatusChange(UUID studentId, String from, String to, String reason) {}
 
     public void history(UUID tenantId, List<StatusChange> changes, UUID actorId, String actorName, Instant now) {

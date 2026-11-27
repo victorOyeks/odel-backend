@@ -3,7 +3,6 @@ package com.odel.student.client;
 import com.odel.common.internal.InternalClient;
 import com.odel.common.tenancy.TenantContext;
 import com.odel.student.dto.NotificationDtos.TenantLook;
-import com.odel.student.dto.TenantDtos.PortalView;
 import com.odel.student.dto.TenantDtos.TenantView;
 import org.springframework.stereotype.Component;
 
@@ -40,8 +39,7 @@ public class TenantClient {
         Cached c = cache.get(id);
         if (c != null && System.currentTimeMillis() - c.at() < 60_000) return c;
         TenantView t = internal.get(InternalClient.Service.TENANT, "/internal/tenants/" + id, TenantView.class);
-        PortalView p = internal.get(InternalClient.Service.TENANT, "/internal/tenants/" + id + "/portal", PortalView.class);
-        c = new Cached(t, p.portalUrl(), System.currentTimeMillis());
+        c = new Cached(t, t.portalUrl(), System.currentTimeMillis());
         cache.put(id, c);
         return c;
     }

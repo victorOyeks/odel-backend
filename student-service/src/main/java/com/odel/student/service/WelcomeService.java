@@ -152,7 +152,7 @@ public class WelcomeService {
             w.setReminderDueAt(remind == null ? null : now.plus(Duration.ofDays(remind)));
             long active = students.countByStatus(Student.Status.ACTIVE);
             w.setSkippedActive((int) active);
-            sends.saveAndFlush(w);
+            w = sends.saveAndFlush(w); // the saved copy carries the university (@TenantId)
             int n = repo.addAllNotActivated(t, w.getId(), now);
             if (n == 0) throw new ApiException(HttpStatus.CONFLICT, "nobody_to_send", "Every student has already activated, or none are imported yet.");
             w.setTotalStudents(n);
@@ -176,7 +176,7 @@ public class WelcomeService {
     }
 
     public SendView send(UUID id) {
-        return tx.execute(s -> sends.findById(id).map(this::view).orElseThrow(ApiException::notFound));
+        return tx.execute(s -> sends.findInTenant(id).map(this::view).orElseThrow(ApiException::notFound));
     }
 
     public PageResponse<SendView> sends(int page, int size) {
@@ -259,7 +259,7 @@ public class WelcomeService {
     }
 
     SendView view(WelcomeSend w) {
-        Map<String, Long> c = repo.counts(w.getTenantId(), w.getId());
+        Map<String, Long> c = repo.counts(w.getTenantId() != null ? w.getTenantId() : TenantContext.require(), w.getId());
         long sent = c.getOrDefault("SENT", 0L), failed = c.getOrDefault("FAILED", 0L);
         long sending = c.getOrDefault("PENDING", 0L) + c.getOrDefault("QUEUED", 0L);
         long noEmail = c.getOrDefault("SKIPPED_NO_EMAIL", 0L), test = c.getOrDefault("SKIPPED_TEST_ADDRESS", 0L);

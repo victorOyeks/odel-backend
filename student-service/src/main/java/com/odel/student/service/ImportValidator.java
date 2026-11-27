@@ -372,14 +372,25 @@ public final class ImportValidator {
             }
             for (var c : centreList) {
                 centres.putIfAbsent(key(c.code()), c);
-                if (c.name() != null) centres.putIfAbsent(key(c.name()), c);
+                if (c.name() != null) {
+                    centres.putIfAbsent(key(c.name()), c);
+                    centres.putIfAbsent(key(plain(c.name())), c); // "Akure" for "Akure Study Centre"
+                }
                 if (c.shortName() != null) centres.putIfAbsent(key(c.shortName()), c);
             }
         }
 
         AcademicLookup.Programme programme(String v) { return programmes.get(key(v)); }
 
-        AcademicLookup.Centre centre(String v) { return centres.get(key(v)); }
+        AcademicLookup.Centre centre(String v) {
+            AcademicLookup.Centre c = centres.get(key(v));
+            return c != null ? c : centres.get(key(plain(v)));
+        }
+
+        /** A centre's name without "Study Centre" / "Centre" at the end. */
+        static String plain(String name) {
+            return name.replaceAll("(?i)\\s*(study\\s+)?cent(re|er)\\s*$", "").trim();
+        }
 
         String suggestProgramme(String v) {
             return best(v, programmeList.stream().map(p -> Map.entry(p.code(), p.code())).toList());
@@ -388,7 +399,7 @@ public final class ImportValidator {
         String suggestCentre(String v) {
             List<Map.Entry<String, String>> c = new ArrayList<>();
             for (var x : centreList) {
-                String label = x.shortName() != null ? x.shortName() : x.name();
+                String label = x.name() != null ? x.name() : x.code();
                 c.add(Map.entry(x.code(), label));
                 if (x.name() != null) c.add(Map.entry(x.name(), label));
                 if (x.shortName() != null) c.add(Map.entry(x.shortName(), label));
