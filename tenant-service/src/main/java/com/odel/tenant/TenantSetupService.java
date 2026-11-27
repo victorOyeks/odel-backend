@@ -137,6 +137,48 @@ public class TenantSetupService {
         }
     }
 
+    public record Changes(String name, String shortName, Branding branding) {}
+
+    /** SA-01b Edit: name and branding. Colours pass the same readability check as on creation. */
+    public Tenant update(UUID id, Changes in, AuditService.Actor actor) {
+        return tx.execute(st -> {
+            Tenant t = tenants.findById(id).filter(x -> !x.isPlatform()).orElseThrow(ApiException::notFound);
+            Map<String, Object> before = Map.of("name", t.getName(), "shortName", t.getShortName(), "primaryColor", t.getPrimaryColor(),
+                    "accentColor", t.getAccentColor(), "logoKey", t.getLogoKey() == null ? "" : t.getLogoKey());
+            Map<String, String> fields = new LinkedHashMap<>();
+            if (in.name() != null && in.name().isBlank()) fields.put("name", "Enter the university's name.");
+            if (in.shortName() != null && in.shortName().isBlank()) fields.put("shortName", "Enter a short name.");
+            Branding b = in.branding();
+            if (b != null) {
+                if (b.primaryColor() != null && !Contrast.isHex(b.primaryColor())) fields.put("primaryColor", "Enter a colour like #1A2368.");
+                if (b.accentColor() != null && !Contrast.isHex(b.accentColor())) fields.put("accentColor", "Enter a colour like #C27808.");
+                if (b.logoKey() != null && !b.logoKey().isEmpty() && !b.logoKey().matches("logos/[a-f0-9-]{36}\\.(svg|png)")) fields.put("logoKey", "Upload the logo again.");
+            }
+            if (!fields.isEmpty()) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "Some details need fixing.", fields);
+            if (in.name() != null) t.setName(in.name().trim());
+            if (in.shortName() != null) t.setShortName(in.shortName().trim());
+            if (b != null) {
+                if (b.primaryColor() != null) {
+                    String primary = b.primaryColor().toUpperCase(Locale.ROOT);
+                    double ratio = Contrast.ratio(primary, "#FFFFFF");
+                    if (ratio < Contrast.MIN) {
+                        throw ApiException.fields(HttpStatus.UNPROCESSABLE_ENTITY, "contrast", "The main colour is hard to read with white text on it.",
+                                Map.of("primaryColor", "White text on " + primary + " is " + Contrast.format(ratio) + "; it needs 4.5 : 1"));
+                    }
+                    t.setPrimaryColor(primary);
+                }
+                if (b.accentColor() != null) t.setAccentColor(b.accentColor().toUpperCase(Locale.ROOT));
+                if (b.logoKey() != null) t.setLogoKey(b.logoKey().isEmpty() ? null : b.logoKey());
+            }
+            t.setUpdatedAt(clock.instant());
+            audit.record(new AuditService.Entry(t.getId(), actor, "TENANT_UPDATED", "tenant", t.getId(),
+                    "Updated " + t.getName() + "'s details and branding", before,
+                    Map.of("name", t.getName(), "shortName", t.getShortName(), "primaryColor", t.getPrimaryColor(),
+                            "accentColor", t.getAccentColor(), "logoKey", t.getLogoKey() == null ? "" : t.getLogoKey())));
+            return t;
+        });
+    }
+
     /** The first admin as identity-service reports it. */
     public record Admin(UUID id, String fullName, String email, Instant invitedAt, boolean accepted, Instant acceptedAt) {}
 

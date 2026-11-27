@@ -165,6 +165,9 @@ Rules and payments (SA-04) are not in B0: universities get the default rules, se
  "nextSteps":[{"label":"Tenant created with its own data store","done":true}, {"label":"Branding applied to web, emails and slips","done":true}, {"label":"Invitation emailed to Ngozi Adebayo","done":true}, {"label":"Waiting: DNS record for odel.wesleyuni.edu.ng","done":false}, {"label":"Waiting: Ngozi Adebayo completes the setup checklist","done":false}]}
 ```
 
+### `PATCH /platform/tenants/{id}` (SA-01b Edit)
+Any of `{"name","shortName","branding":{"primaryColor","accentColor","logoKey"}}`; omitted fields stay. `logoKey: ""` removes the logo. Same `400`/`422 contrast` errors as create; returns the tenant detail. Audited as `TENANT_UPDATED` with old and new values.
+
 ### `POST /platform/tenants/{id}/resend-invitation` → `204`.
 
 ### `GET /platform/audit?tenantId=&page=` (SA-09)

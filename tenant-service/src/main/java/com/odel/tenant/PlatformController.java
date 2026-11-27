@@ -101,6 +101,16 @@ public class PlatformController {
         return detail(tenants.findById(id).filter(t -> !t.isPlatform()).orElseThrow(ApiException::notFound));
     }
 
+    @PatchMapping("/tenants/{id}")
+    public TenantDetail update(CurrentUserArg.Holder cu, @PathVariable UUID id, @RequestBody TenantSetupService.Changes body) {
+        if (body.branding() != null && body.branding().logoKey() != null && !body.branding().logoKey().isEmpty()) {
+            var size = storage.size(body.branding().logoKey());
+            if (size.isEmpty()) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "The logo did not upload.", Map.of("logoKey", "Upload the logo again."));
+            if (size.getAsLong() > MAX_LOGO_BYTES) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "The logo is too large.", Map.of("logoKey", "Use a file under 2 MB."));
+        }
+        return detail(setup.update(id, body, actor(cu.user())));
+    }
+
     @PostMapping("/tenants/{id}/resend-invitation")
     public ResponseEntity<Void> resend(CurrentUserArg.Holder cu, @PathVariable UUID id) {
         setup.resendInvitation(id, actor(cu.user()));
