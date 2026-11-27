@@ -1,7 +1,6 @@
 name: CI
+# Pull requests only: a push to develop runs the deploy workflow alone (it builds the changed services), as in hospio-backend.
 on:
-  push:
-    branches: [develop, main]
   pull_request:
 jobs:
   test:
