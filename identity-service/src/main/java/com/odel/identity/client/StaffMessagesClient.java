@@ -1,7 +1,7 @@
 package com.odel.identity.client;
 
 import com.odel.common.internal.InternalClient;
-import com.odel.identity.User;
+import com.odel.identity.entity.User;
 import com.odel.identity.dto.StaffDtos.TenantLook;
 import org.springframework.stereotype.Component;
 

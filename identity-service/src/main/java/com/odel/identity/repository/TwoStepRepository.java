@@ -1,6 +1,6 @@
 package com.odel.identity.repository;
 
-import com.odel.identity.TrustedDevice;
+import com.odel.identity.entity.TrustedDevice;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;

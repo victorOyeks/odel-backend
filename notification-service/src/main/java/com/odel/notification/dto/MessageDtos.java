@@ -1,6 +1,6 @@
 package com.odel.notification.dto;
 
-import com.odel.notification.MessageService;
+import com.odel.notification.service.MessageService;
 
 import java.time.Instant;
 import java.util.List;

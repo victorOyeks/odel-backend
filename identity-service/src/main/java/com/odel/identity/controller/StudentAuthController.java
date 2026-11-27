@@ -1,8 +1,8 @@
 package com.odel.identity.controller;
 
 import com.odel.common.tenancy.TenantContext;
-import com.odel.identity.SessionView;
-import com.odel.identity.TenantInfo;
+import com.odel.identity.dto.SessionView;
+import com.odel.identity.dto.TenantInfo;
 import com.odel.identity.dto.StudentAuthDtos.*;
 import com.odel.identity.service.PasswordRules;
 import com.odel.identity.service.StudentAuthService;

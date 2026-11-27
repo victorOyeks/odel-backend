@@ -1,6 +1,6 @@
 package com.odel.identity.repository;
 
-import com.odel.identity.RoleAssignment;
+import com.odel.identity.entity.RoleAssignment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
