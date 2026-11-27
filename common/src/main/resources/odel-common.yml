@@ -54,6 +54,9 @@ management:
         enabled: true
 
 odel:
+  logging:
+    # Log request bodies and error-response bodies (secrets masked, 2 KB max). On for dev via ODEL_LOG_BODIES; off in production.
+    bodies: ${ODEL_LOG_BODIES:false}
   console-host: ${ODEL_CONSOLE_HOST:console.${ODEL_BASE_DOMAIN:localhost}}
   internal-api-key: ${ODEL_INTERNAL_API_KEY:dev-internal-key}
   services:
@@ -108,6 +111,9 @@ logging:
   level:
     root: INFO
     com.odel: INFO
+  pattern:
+    # The request id ties a request's lines together (set by LoggingInterceptor).
+    level: "%5p [%X{reqId:-}]"
 
 ---
 spring:
