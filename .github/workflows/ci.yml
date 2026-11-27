@@ -13,5 +13,5 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      # Tests start real Postgres and Redis containers (Testcontainers).
+      # Unit tests per module; the end-to-end phase tests (e2e-tests) run against a running stack.
       - run: mvn -B verify

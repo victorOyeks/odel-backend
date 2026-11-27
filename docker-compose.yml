@@ -9,7 +9,9 @@ services:
       POSTGRES_USER: odel
       POSTGRES_PASSWORD: odel
     ports: ["5440:5432"]
-    volumes: [odel-pg:/var/lib/postgresql/data]
+    volumes:
+      - odel-pg:/var/lib/postgresql/data
+      - ./docker/init-schemas.sql:/docker-entrypoint-initdb.d/01-schemas.sql:ro
   redis:
     image: redis:7-alpine
     ports: ["6390:6379"]

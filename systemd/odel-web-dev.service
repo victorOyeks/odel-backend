@@ -1,0 +1,20 @@
+[Unit]
+Description=ODeL web (student, staff and provider console) (dev)
+After=network.target odel-api-gateway.service
+ConditionPathExists=/home/devoyeks/apps/odel-web-dev/current/server.js
+
+[Service]
+Type=simple
+User=devoyeks
+WorkingDirectory=/home/devoyeks/apps/odel-web-dev/current
+Environment=NODE_ENV=production
+Environment=PORT=3100
+Environment=HOSTNAME=127.0.0.1
+Environment=ODEL_API_URL=http://127.0.0.1:9300
+ExecStart=/usr/bin/env node /home/devoyeks/apps/odel-web-dev/current/server.js
+Restart=always
+RestartSec=5
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

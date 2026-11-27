@@ -1,0 +1,49 @@
+server:
+  port: ${GATEWAY_PORT:9300}
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 20s
+      routes:
+        # Paths stay /api/v1/... end to end; each service owns its prefixes. /internal/** is never routed.
+        - id: identity-service
+          uri: http://${IDENTITY_HOST:127.0.0.1}:9301
+          predicates:
+            - Path=/api/v1/auth/**,/api/v1/session,/api/v1/session/**,/api/v1/me/**,/api/v1/dev/totp,/api-docs/identity
+        - id: tenant-service
+          uri: http://${TENANT_HOST:127.0.0.1}:9302
+          predicates:
+            - Path=/api/v1/public/**,/api/v1/platform/**,/api/v1/setup/**,/api/v1/dev/storage/**,/api-docs/tenant
+        - id: notification-service
+          uri: http://${NOTIFICATION_HOST:127.0.0.1}:9303
+          predicates:
+            - Path=/api/v1/notifications,/api/v1/notifications/**,/api/v1/push-tokens,/api/v1/dev/emails,/api-docs/notification
+
+odel:
+  internal-api-key: ${ODEL_INTERNAL_API_KEY:dev-internal-key}
+  services:
+    tenant: http://${TENANT_HOST:127.0.0.1}:9302
+
+# One Swagger page for every service: https://<api host>/swagger-ui.html
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: identity-service
+        url: /api-docs/identity
+      - name: tenant-service
+        url: /api-docs/tenant
+      - name: notification-service
+        url: /api-docs/notification
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: tenant-service
+  config:
+    import: classpath:odel-common.yml
+  datasource:
+    # One Postgres database; this service owns schema "tenant". "app" holds the shared audit log.
+    url: jdbc:postgresql://${ODEL_DB_HOST:localhost}:${ODEL_DB_PORT:5440}/${ODEL_DB_NAME:odel}?currentSchema=tenant,app
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    default-schema: tenant
+  jpa:
+    properties:
+      hibernate.default_schema: tenant
+
+server:
+  port: ${TENANT_PORT:9302}
+
+springdoc:
+  api-docs:
+    path: /api-docs/tenant
+  swagger-ui:
+    enabled: false   # one Swagger UI for every service, on the api-gateway
