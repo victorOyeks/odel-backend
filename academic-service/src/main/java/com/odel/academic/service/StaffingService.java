@@ -249,10 +249,11 @@ public class StaffingService {
         return r;
     }
 
-    private static List<Option> build(List<Staff> staff, String r, UUID departmentId) {
+    static List<Option> build(List<Staff> staff, String r, UUID departmentId) {
+        // Map.entry refuses nulls: keep only people who hold the role before pairing them with it.
         return staff.stream().filter(s -> !s.suspended())
-                .map(s -> Map.entry(s, s.roles().stream().filter(x -> x.role().equals(r)).findFirst().orElse(null)))
-                .filter(e -> e.getValue() != null)
+                .filter(s -> s.roles().stream().anyMatch(x -> x.role().equals(r)))
+                .map(s -> Map.entry(s, s.roles().stream().filter(x -> x.role().equals(r)).findFirst().orElseThrow()))
                 .map(e -> {
                     Staff s = e.getKey(); RoleView rv = e.getValue();
                     boolean here = departmentId != null && departmentId.equals(rv.scopeId());
