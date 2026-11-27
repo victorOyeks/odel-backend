@@ -19,7 +19,7 @@ spring:
         - id: tenant-service
           uri: http://${TENANT_HOST:127.0.0.1}:9302
           predicates:
-            - Path=/api/v1/public/**,/api/v1/platform/**,/api/v1/setup/**,/api/v1/dev/storage/**,/api-docs/tenant
+            - Path=/api/v1/public/**,/api/v1/platform/**,/api/v1/setup/**,/api/v1/dev/storage/**,/api/v1/dev/tenants/**,/api-docs/tenant
         - id: notification-service
           uri: http://${NOTIFICATION_HOST:127.0.0.1}:9303
           predicates:

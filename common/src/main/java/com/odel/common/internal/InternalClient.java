@@ -42,6 +42,10 @@ public class InternalClient {
         return call(() -> spec(http.post().uri(base(s) + path)).contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(type));
     }
 
+    public void delete(Service s, String path) {
+        call(() -> spec(http.delete().uri(base(s) + path)).retrieve().toBodilessEntity());
+    }
+
     @SuppressWarnings("unchecked")
     private <S extends RestClient.RequestHeadersSpec<?>> S spec(S spec) {
         spec.header(InternalKeyFilter.HEADER, props.internalApiKey());
