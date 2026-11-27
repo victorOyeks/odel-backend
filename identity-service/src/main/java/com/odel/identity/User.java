@@ -40,6 +40,9 @@ public class User {
     private Instant invitedAt;
     private Instant acceptedAt;
     private Instant lastSignInAt;
+    private Instant suspendedAt;
+    private String suspendedReason;
+    private UUID invitedBy;
     private Instant createdAt;
     private Instant updatedAt;
 
