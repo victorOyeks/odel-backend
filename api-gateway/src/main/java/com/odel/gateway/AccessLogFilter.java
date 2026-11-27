@@ -30,7 +30,7 @@ public class AccessLogFilter implements GlobalFilter, Ordered {
             int code = status == null ? 0 : status.value();
             String host = req.getHeaders().getFirst(TenantHeaderFilter.HOST);
             String fwd = req.getHeaders().getFirst("X-Forwarded-For");
-            String ip = fwd != null ? fwd.split(",")[0].trim() : req.getRemoteAddress() == null ? "-" : req.getRemoteAddress().getAddress().getHostAddress();
+            String ip = fwd != null ? fwd.split(",")[0].trim() : req.getRemoteAddress() == null ? "-" : req.getRemoteAddress().getHostString();
             String line = "<<< {} {} -> {} ({}ms) | host: {} | ip: {}";
             Object[] args = {req.getMethod(), path, code, System.currentTimeMillis() - start, host == null ? "-" : host, ip};
             if (code >= 500 || code == 0) log.error(line, args);
