@@ -15,6 +15,6 @@ public interface StaffRepository extends JpaRepository<User, UUID> {
     @Query("select x from User x where x.id = ?1")
     Optional<User> findById(UUID id);
 
-    @Query("select u from User u where u.authType = com.odel.identity.User.AuthType.GOOGLE order by lower(u.fullName)")
+    @Query("select u from User u where u.authType = com.odel.identity.entity.User.AuthType.GOOGLE order by lower(u.fullName)")
     List<User> staff();
 }
