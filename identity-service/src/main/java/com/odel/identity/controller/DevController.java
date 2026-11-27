@@ -118,7 +118,7 @@ public class DevController {
                   @media (max-width:420px){.body{padding:22px 18px}.top{padding:18px}.row{flex-direction:column}.role{display:none}}
                 </style></head><body>
                 <main class="card">
-                  <div class="top"><span class="crest" id="crest">%4$s</span><div><b>%1$s</b><span>%5$s</span></div></div>
+                  <div class="top"><span class="crest" id="crest">%9$s</span><div><b>%1$s</b><span>%5$s</span></div></div>
                   <div class="body">
                     <span class="tag">Development sign-in</span>
                     <h1>Choose an account</h1>
@@ -136,15 +136,10 @@ public class DevController {
                     <div class="note"><span aria-hidden="true">ⓘ</span><span>Real Google sign-in with the university's accounts replaces this page before launch.</span></div>
                   </div>
                 </main>
-                <script>
-                  fetch("/api/v1/public/context").then(r => r.ok ? r.json() : null).then(c => {
-                    const url = c && c.tenant && c.tenant.logoUrl; if (!url) return;
-                    const img = new Image(); img.alt = ""; img.src = url;
-                    img.onload = () => { const el = document.getElementById("crest"); el.textContent = ""; el.appendChild(img); };
-                  }).catch(() => {});
-                </script>
                 </body></html>""".formatted(esc(t.name()), brand, accent, esc(initials), portal, esc(state),
-                rows.isEmpty() ? "<div class=\"empty\">No staff accounts yet.</div>" : rows.toString(), esc(domainHint));
+                rows.isEmpty() ? "<div class=\"empty\">No staff accounts yet.</div>" : rows.toString(), esc(domainHint),
+                // The crest is in the page itself (stable, cached address), so it shows with the page.
+                t.logoUrl() == null ? esc(initials) : "<img src=\"" + esc(t.logoUrl()) + "\" alt=\"\" width=\"40\" height=\"40\" fetchpriority=\"high\" decoding=\"sync\">");
         return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
     }
 
