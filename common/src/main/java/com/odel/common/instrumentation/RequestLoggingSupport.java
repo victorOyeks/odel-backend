@@ -11,12 +11,7 @@ public final class RequestLoggingSupport {
     }
 
     public static String getClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        String real = request.getHeader("X-Real-IP");
-        return real != null && !real.isBlank() ? real : request.getRemoteAddr();
+        return com.odel.common.RequestInfo.clientIp(request.getHeader("X-Real-IP"), request.getHeader("X-Forwarded-For"), request.getRemoteAddr());
     }
 
     /** The signed-in user's id and active role, or "anonymous": what the request log shows (no names in the log). */

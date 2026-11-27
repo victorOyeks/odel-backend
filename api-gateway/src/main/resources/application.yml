@@ -9,6 +9,10 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      # No RFC 7239 "Forwarded" header naming the gateway's own peer (the web app, 127.0.0.1): services read the client
+      # from X-Real-IP / X-Forwarded-For, which pass through unchanged.
+      forwarded:
+        enabled: false
       httpclient:
         connect-timeout: 2000
         response-timeout: 20s

@@ -20,10 +20,17 @@ public final class RequestInfo {
 
     public static String ip() {
         HttpServletRequest r = current();
-        if (r == null) return null;
-        String fwd = r.getHeader("X-Forwarded-For");
-        if (fwd != null && !fwd.isBlank()) return fwd.split(",")[0].trim();
-        return r.getRemoteAddr();
+        return r == null ? null : clientIp(r.getHeader("X-Real-IP"), r.getHeader("X-Forwarded-For"), r.getRemoteAddr());
+    }
+
+    /**
+     * The browser's address: nginx's X-Real-IP (it sets it from the connection, so a client cannot fake it), else the first
+     * X-Forwarded-For entry, else the peer. Behind nginx → web → gateway the peer is always 127.0.0.1.
+     */
+    public static String clientIp(String realIp, String forwardedFor, String remoteAddr) {
+        if (realIp != null && !realIp.isBlank()) return realIp.trim();
+        if (forwardedFor != null && !forwardedFor.isBlank()) return forwardedFor.split(",")[0].trim();
+        return remoteAddr;
     }
 
     public static String userAgent() {

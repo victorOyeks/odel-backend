@@ -36,7 +36,11 @@ spring:
 server:
   # Services listen only on the loopback: the gateway is the way in, so the X-Odel-Tenant headers can be trusted.
   address: ${ODEL_SERVICE_ADDRESS:127.0.0.1}
-  forward-headers-strategy: framework
+  # Not "framework": the gateway adds an RFC 7239 "Forwarded: for=<its own peer>" header, which "framework" prefers to
+  # X-Forwarded-For, so every audit entry showed 127.0.0.1; and it answers 400 to a bare IPv6 X-Forwarded-For.
+  # RequestInfo reads the client address itself (X-Real-IP, set by nginx, then X-Forwarded-For). Cookies' Secure flag
+  # comes from odel.session.secure-cookies, and redirects stay relative, so nothing else needs the forwarded data.
+  forward-headers-strategy: none
   error:
     include-message: never
 
