@@ -49,6 +49,16 @@ public class TenantSetupService {
         this.clock = clock;
     }
 
+    /** Reserved for tests and examples: they can never have a real DNS record, so they are refused as a university's own domain. */
+    static boolean reservedDomain(String host) {
+        String h = host.toLowerCase(Locale.ROOT);
+        String tld = h.substring(h.lastIndexOf('.') + 1);
+        if (java.util.Set.of("test", "example", "invalid", "localhost", "local").contains(tld)) return true;
+        return java.util.stream.Stream.of("example.com", "example.org", "example.net").anyMatch(d -> h.equals(d) || h.endsWith("." + d));
+    }
+
+    static final String RESERVED_MESSAGE = "Use a real domain the university controls; test domains like .test or example.com can never be reached.";
+
     public record Branding(String primaryColor, String accentColor, String logoKey) {}
 
     public record FirstAdmin(String fullName, String email) {}
@@ -158,6 +168,7 @@ public class TenantSetupService {
             }
             String web = in.webAddress() == null ? null : in.webAddress().trim().toLowerCase(Locale.ROOT);
             if (web != null && !web.isEmpty() && !web.matches(HOST)) fields.put("webAddress", "Enter a web address like odl.wesleyuni.edu.ng, without https://.");
+            else if (web != null && !web.isEmpty() && reservedDomain(web)) fields.put("webAddress", RESERVED_MESSAGE);
             if (web != null && !web.isEmpty() && !web.equals(t.getWebAddress()) && tenants.existsByWebAddressIgnoreCase(web)) {
                 throw new ApiException(HttpStatus.CONFLICT, "web_address_taken", web + " is already used by another university.");
             }
@@ -249,6 +260,7 @@ public class TenantSetupService {
             f.put("slug", "Use 2 to 31 lowercase letters, numbers or hyphens, starting with a letter.");
         if (!blank(in.webAddress()) && !in.webAddress().trim().toLowerCase(Locale.ROOT).matches(HOST))
             f.put("webAddress", "Enter a web address like odel.wesleyuni.edu.ng, without https://.");
+        else if (!blank(in.webAddress()) && reservedDomain(in.webAddress().trim())) f.put("webAddress", RESERVED_MESSAGE);
         if (blank(in.googleDomain()) || !in.googleDomain().trim().toLowerCase(Locale.ROOT).matches(HOST))
             f.put("googleDomain", "Enter the staff Google domain, for example wesleyuni.edu.ng.");
         Branding b = in.branding();

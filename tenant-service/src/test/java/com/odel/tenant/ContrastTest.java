@@ -18,4 +18,11 @@ class ContrastTest {
         assertThat(Contrast.ratio("#F5D76E", "#FFFFFF")).isLessThan(Contrast.MIN);
         assertThat(Contrast.ratio("#000000", "#FFFFFF")).isEqualTo(21.0);
     }
+
+    @Test
+    void reservedTestDomainsAreRefusedAsOwnDomains() {
+        assertThat(TenantSetupService.reservedDomain("odl.lakeshore.test")).isTrue();
+        assertThat(TenantSetupService.reservedDomain("odl.example.com")).isTrue();
+        assertThat(TenantSetupService.reservedDomain("odl.wesleyuni.edu.ng")).isFalse();
+    }
 }
