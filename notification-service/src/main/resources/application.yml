@@ -16,6 +16,11 @@ spring:
 server:
   port: ${NOTIFICATION_PORT:9303}
 
+odel:
+  mail:
+    # Dev only: comma list of domains email may go to (e.g. gmail.com,oyeksglobal.com); empty = everyone (production).
+    allow-domains: ${ODEL_MAIL_ALLOW_DOMAINS:}
+
 springdoc:
   api-docs:
     path: /api-docs/notification

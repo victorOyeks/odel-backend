@@ -48,6 +48,12 @@ public class StaffingController {
         return staffing.copy(body == null ? new CopyIn(null, null) : body, identity.actor(cu.user()));
     }
 
+    @GetMapping(value = "/staff-options", params = "roles")
+    public Map<String, Map<String, List<Option>>> optionsByRole(CurrentUserArg.Holder cu, @RequestParam String roles, @RequestParam(required = false) UUID departmentId) {
+        Guard.read(cu.user());
+        return Map.of("byRole", staffing.optionsByRole(roles, departmentId));
+    }
+
     @GetMapping("/staff-options")
     public Map<String, List<Option>> options(CurrentUserArg.Holder cu, @RequestParam String role, @RequestParam(required = false) UUID departmentId) {
         Guard.read(cu.user());

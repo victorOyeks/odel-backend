@@ -134,7 +134,7 @@ public class WelcomeWorker {
                     switch (st.status()) {
                         case "SENT" -> updates.add(new Object[]{"SENT", null, null, Timestamp.from(now), d.id()});
                         case "FAILED" -> updates.add(new Object[]{"FAILED", null, st.error() == null ? "Could not be delivered" : cut(st.error()), Timestamp.from(now), d.id()});
-                        case "SKIPPED" -> updates.add(new Object[]{"SKIPPED_TEST_ADDRESS", null, "Not sent: test address", Timestamp.from(now), d.id()});
+                        case "SKIPPED" -> updates.add(new Object[]{"SKIPPED_TEST_ADDRESS", null, st.error() == null ? "Not sent: test address" : cut(st.error()), Timestamp.from(now), d.id()});
                         default -> { }
                     }
                 }

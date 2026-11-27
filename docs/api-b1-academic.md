@@ -206,6 +206,9 @@ People who may be picked for a role (from identity-service), active and invited 
 
 ---
 
+`GET /academic/staff-options?roles=LECTURER,FACILITATOR,EXAM_OFFICER&departmentId=` → `{"byRole":{"LECTURER":[…],"FACILITATOR":[…],"EXAM_OFFICER":[…]}}`
+(the same option rows per role, from one call to identity-service: the W-16b dialog loads its lists once).
+
 ## 6. Grading rules (W-17 … W-17e)
 
 Rules are versioned: every save adds a new version that applies from an effective session (default: the current session).

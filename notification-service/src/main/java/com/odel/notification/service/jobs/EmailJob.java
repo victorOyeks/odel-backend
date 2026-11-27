@@ -1,5 +1,6 @@
 package com.odel.notification.service.jobs;
 
+import com.odel.notification.service.MailAllowList;
 import com.odel.notification.service.TestAddresses;
 
 import com.odel.notification.client.EmailSender;
@@ -27,11 +28,13 @@ public class EmailJob implements JobHandler {
     private final JdbcTemplate jdbc;
     private final EmailSender sender;
     private final Clock clock;
+    private final MailAllowList allowList;
 
-    public EmailJob(JdbcTemplate jdbc, EmailSender sender, Clock clock) {
+    public EmailJob(JdbcTemplate jdbc, EmailSender sender, Clock clock, MailAllowList allowList) {
         this.jdbc = jdbc;
         this.sender = sender;
         this.clock = clock;
+        this.allowList = allowList;
     }
 
     @Override public String type() { return TYPE; }
@@ -48,6 +51,11 @@ public class EmailJob implements JobHandler {
         if (TestAddresses.isTest(row.to())) {
             // A reserved test domain (.test, .example, example.com...) can never receive mail: recorded, never sent.
             jdbc.update("update outbound_messages set status = 'SKIPPED', last_error = 'Not sent: test address' where id = ?", id);
+            return;
+        }
+        if (!allowList.allows(row.to())) {
+            // Dev only (ODEL_MAIL_ALLOW_DOMAINS): recorded and readable in the dev email log, never sent.
+            jdbc.update("update outbound_messages set status = 'SKIPPED', last_error = ? where id = ?", MailAllowList.REASON, id);
             return;
         }
         String fromName = row.fromName();

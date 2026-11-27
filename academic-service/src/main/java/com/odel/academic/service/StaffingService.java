@@ -224,16 +224,39 @@ public class StaffingService {
     }
 
     /** People who may be picked for a role, those scoped to the department first. */
+    private static final Set<String> PICKABLE = Set.of("LECTURER", "FACILITATOR", "EXAM_OFFICER", "CENTRE_COORDINATOR");
+
     public List<Option> options(String role, UUID departmentId) {
+        String r = pickable(role);
+        return build(identity.staff(r), r, departmentId);
+    }
+
+    /** Several roles from one call to identity-service: a staffing dialog loads its lists once (`roles=LECTURER,FACILITATOR`). */
+    public Map<String, List<Option>> optionsByRole(String roles, UUID departmentId) {
+        List<String> rs = Arrays.stream(roles == null ? new String[0] : roles.split(",")).map(String::trim).filter(x -> !x.isEmpty()).map(this::pickable).distinct().toList();
+        if (rs.isEmpty()) pickable(null);
+        List<Staff> all = identity.staff(null);
+        Map<String, List<Option>> out = new LinkedHashMap<>();
+        for (String r : rs) out.put(r, build(all, r, departmentId));
+        return out;
+    }
+
+    private String pickable(String role) {
         String r = role == null ? null : role.toUpperCase(Locale.ROOT);
-        if (r == null || !Set.of("LECTURER", "FACILITATOR", "EXAM_OFFICER", "CENTRE_COORDINATOR").contains(r)) {
+        if (r == null || !PICKABLE.contains(r)) {
             throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "Choose a role.", Map.of("role", "Use LECTURER, FACILITATOR, EXAM_OFFICER or CENTRE_COORDINATOR."));
         }
-        return identity.staff(r).stream().filter(s -> !s.suspended())
-                .map(s -> {
-                    RoleView rv = s.roles().stream().filter(x -> x.role().equals(r)).findFirst().orElse(null);
-                    boolean here = rv != null && departmentId != null && departmentId.equals(rv.scopeId());
-                    return Map.entry(here ? 0 : 1, new Option(s.id(), s.fullName(), s.email(), s.status(), rv == null ? null : rv.scopeLabel()));
+        return r;
+    }
+
+    private static List<Option> build(List<Staff> staff, String r, UUID departmentId) {
+        return staff.stream().filter(s -> !s.suspended())
+                .map(s -> Map.entry(s, s.roles().stream().filter(x -> x.role().equals(r)).findFirst().orElse(null)))
+                .filter(e -> e.getValue() != null)
+                .map(e -> {
+                    Staff s = e.getKey(); RoleView rv = e.getValue();
+                    boolean here = departmentId != null && departmentId.equals(rv.scopeId());
+                    return Map.entry(here ? 0 : 1, new Option(s.id(), s.fullName(), s.email(), s.status(), rv.scopeLabel()));
                 })
                 .sorted(Comparator.<Map.Entry<Integer, Option>>comparingInt(Map.Entry::getKey).thenComparing(e -> e.getValue().fullName()))
                 .map(Map.Entry::getValue).toList();
