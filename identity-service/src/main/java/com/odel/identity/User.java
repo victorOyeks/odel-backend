@@ -46,6 +46,25 @@ public class User {
     private Instant createdAt;
     private Instant updatedAt;
 
+    // ---- students (B1, changelog 003) ----
+    private String matricNumber;
+    private UUID studentId;
+    private String passwordHash;
+    private Instant passwordChangedAt;
+    private String consentVersion;
+    private Instant consentAt;
+    private int failedSignIns;
+    private Instant lockedUntil;
+
+    public boolean isStudent() {
+        return matricNumber != null && authType == AuthType.PASSWORD;
+    }
+
+    public String firstName() {
+        String[] parts = fullName == null ? new String[0] : fullName.trim().split("\\s+");
+        return parts.length == 0 ? "" : parts[0];
+    }
+
     public boolean mfaEnabled() {
         return mfaEnabledAt != null && mfaSecretEnc != null;
     }

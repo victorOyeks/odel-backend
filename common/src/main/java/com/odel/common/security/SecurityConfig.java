@@ -54,6 +54,8 @@ public class SecurityConfig {
                     .requestMatchers("/internal/**").permitAll() // InternalKeyFilter checks the key
                     .requestMatchers("/api/v1/public/**", "/api/v1/auth/google/**", "/api/v1/auth/handoff",
                             "/api/v1/auth/dev/**", "/api/v1/dev/**").permitAll()
+                    // Students: activation, sign-in and password reset by matric number and emailed code (B1).
+                    .requestMatchers("/api/v1/auth/student/**").permitAll()
                     .requestMatchers("/api/v1/session", "/api/v1/session/**", "/api/v1/auth/mfa/**",
                             "/api/v1/auth/sign-out", "/api/v1/me/active-role").authenticated()
                     .requestMatchers("/api/v1/platform/**").hasAuthority("ROLE_SUPER_ADMIN")

@@ -25,6 +25,7 @@
         <module>tenant-service</module>
         <module>notification-service</module>
         <module>academic-service</module>
+        <module>student-service</module>
         <module>e2e-tests</module>
     </modules>
 

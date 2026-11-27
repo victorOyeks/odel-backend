@@ -139,6 +139,8 @@ public class SignInService {
             }
             Optional<User> user = users.findByEmail(email);
             if (user.isEmpty()) return fail(s, tenant, email, "not_linked");
+            // Students sign in with matric number and password, never with Google (B1).
+            if (user.get().getAuthType() != User.AuthType.GOOGLE) return fail(s, tenant, email, "not_linked");
             if (user.get().getStatus() == User.Status.SUSPENDED) return fail(s, tenant, email, "suspended");
             if (roles.findByUserIdOrderByCreatedAt(user.get().getId()).isEmpty()) return fail(s, tenant, email, "no_role");
             String handoff = Tokens.random(24);

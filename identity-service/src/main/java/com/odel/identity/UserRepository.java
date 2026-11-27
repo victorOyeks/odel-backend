@@ -16,4 +16,6 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("select u from User u where lower(u.email) = lower(?1)")
     Optional<User> findByEmail(String email);
+
+    Optional<User> findByMatricNumber(String matricNumber);
 }

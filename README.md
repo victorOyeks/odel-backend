@@ -10,10 +10,11 @@ project, one Spring Boot service per module, one Postgres database (a schema per
 | `tenant-service` | 9302 | Universities (tenants), branding, provider console |
 | `notification-service` | 9303 | Email (Brevo), in-app bell, browser push, templates, background job queue |
 | `academic-service` | 9304 | Sessions and semesters, faculties → departments → programmes, course catalogue, study centres and rooms, staffing, grading rules, the setup checklist |
+| `student-service` | 9305 | Student records, portal CSV import, welcome emails, students list and record (B1) |
 | `common` | (library) | Errors, tenancy, sessions and security, audit log, signed file links, internal calls |
 | `e2e-tests` | (tests) | Each build phase's end-to-end journey, run against a running stack |
 
-Later phases add their own services (students, enrolment and payments, courses, live classes, exams, results...).
+Later phases add their own services (enrolment and payments, courses, live classes, exams, results...).
 
 How the pieces talk:
 - The web app proxies `/api/*` to the gateway with the browser's host in `X-Odel-Host`. The gateway asks
@@ -57,7 +58,7 @@ Never edit a shipped file: add the next numbered one. `common/.../000-app.sql` (
 ## Deploying (dev)
 
 Push `develop`: `.github/workflows/deploy-dev.yml` builds the changed services, copies the jars to the dev VPS and restarts
-them in order (tenant, identity, academic, notification, gateway) with a health check and rollback. One-time box set-up:
+them in order (tenant, identity, academic, student, notification, gateway) with a health check and rollback. One-time box set-up:
 `scripts/vps/bootstrap-dev.sh` (database, schemas, `/opt/odel-dev/.env.dev`, systemd units, nginx, certificates).
 
 | What | Where |
@@ -73,5 +74,6 @@ them in order (tenant, identity, academic, notification, gateway) with a health 
 
 - `docs/api-b0.md`: the API contract for B0.
 - `docs/api-b1-academic.md`: B1 academic setup (sessions, structure, catalogue, centres, staffing, grading, checklist, People & roles, audit log).
+- `docs/api-b1-students.md`: B1 students (import, welcome emails, student activation, sign-in and reset).
 - `docs/tech-stack.md`: what each technology is for.
 - Build plan: the "Build plan" tab of the presenter's guide (B0–B12).

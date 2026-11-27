@@ -9,4 +9,5 @@
     <include file="db/changelog/common/000-app.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/001-identity.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/002-staff-admin.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/003-student-accounts.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

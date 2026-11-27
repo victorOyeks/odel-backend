@@ -9,5 +9,6 @@
     <include file="db/changelog/common/000-app.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/001-notification.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/002-skipped-status.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/003-student-templates.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/004-staff-templates.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>
