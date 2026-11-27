@@ -190,22 +190,24 @@ class StudentsInJourneyTest {
     }
 
     /**
-     * The programmes and centres the files use. With academic-service running they are created through its API (W-12, W-14);
-     * without it, student-service runs with its stub (ODEL_ACADEMIC_LOOKUP=stub), which has the same codes and names.
+     * The programmes and centres the files use, created through academic-service's API (W-12, W-14); student-service reads
+     * them back from GET /internal/academic/reference (centre phones included, for {centre_phone} and E-03).
      */
     void academicSetUp(Browser admin) {
-        if (admin.get("/api/v1/academic/structure").status() != 200) return;
+        assertThat(admin.get("/api/v1/academic/structure").status()).as("academic-service must be running").isEqualTo(200);
         String faculty = created(admin.post("/api/v1/academic/faculties", Map.of("name", "Faculty of Science", "code", "SCI")));
         String dept = created(admin.post("/api/v1/academic/departments", Map.of("facultyId", faculty, "name", "Computer Science", "code", "CSC")));
         for (String[] p : new String[][]{{"B.Sc. Computer Science", "BSC-CSC-ODL"}, {"B.Sc. Info. Technology", "BSC-IFT-ODL"}}) {
             created(admin.post("/api/v1/academic/programmes", Map.of("departmentId", dept, "name", p[0], "code", p[1], "degree", "B.Sc.",
                     "durationYears", 4, "entryLevels", List.of(100, 200, 300, 400))));
         }
-        for (String[] c : new String[][]{{"Akure Study Centre", "AKR", "Ondo"}, {"Lagos (Ikeja)", "LAG", "Lagos"}, {"Abuja Study Centre", "ABJ", "FCT"},
-                {"Ondo (main campus)", "OND", "Ondo"}, {"Ibadan Study Centre", "IBD", "Oyo"}}) {
-            created(admin.post("/api/v1/academic/centres", Map.of("name", c[0], "code", c[1], "address", "1 Campus Road", "state", c[2])));
+        for (String[] c : new String[][]{{"Akure Study Centre", "AKR", "Ondo", AKURE_PHONE}, {"Lagos (Ikeja)", "LAG", "Lagos", "0803 555 0118"},
+                {"Abuja Study Centre", "ABJ", "FCT", ABUJA_PHONE}, {"Ondo (main campus)", "OND", "Ondo", "0803 555 0120"}, {"Ibadan Study Centre", "IBD", "Oyo", "0803 555 0121"}}) {
+            created(admin.post("/api/v1/academic/centres", Map.of("name", c[0], "code", c[1], "address", "1 Campus Road", "state", c[2], "phone", c[3])));
         }
     }
+
+    static final String AKURE_PHONE = "0803 555 0117", ABUJA_PHONE = "0803 555 0119";
 
     static String created(Browser.Res r) {
         assertThat(r.status()).as(r.body()).isEqualTo(201);
@@ -301,7 +303,7 @@ class StudentsInJourneyTest {
         Browser.Res bad = ngoziB.send("PUT", "/api/v1/students/welcome/template", Map.of("subject", "Welcome", "body", "Hello {firstname} {activation_link}"), "application/json");
         assertThat(bad.status()).isEqualTo(400);
         assertThat(bad.json().at("/fields/body").asText()).contains("{firstname}");
-        String body = "Hello {first_name},\nYou have been admitted to {programme} at {centre_name}. Your matric number is {matric}.\nActivate your portal account: {activation_link}";
+        String body = "Hello {first_name},\nYou have been admitted to {programme} at {centre_name}. Your matric number is {matric}.\nActivate your portal account: {activation_link}\nQuestions? Call your study centre on {centre_phone}.";
         Browser.Res saved = ngoziB.send("PUT", "/api/v1/students/welcome/template",
                 Map.of("subject", "Welcome to {university_name} ODeL — activate your account", "body", body), "application/json");
         assertThat(saved.status()).as(saved.body()).isEqualTo(200);
@@ -342,7 +344,7 @@ class StudentsInJourneyTest {
 
         JsonNode welcome = email(adeolaEmail, "Welcome to Wesley University ODeL", Set.of(), 30);
         assertThat(welcome.get("body").asText()).startsWith("Hello Adeola,")
-                .contains("B.Sc. Computer Science at Akure Study Centre").contains(wesleyHost + "/activate?matric=WU%2FODL%2F24%2F0153");
+                .contains("B.Sc. Computer Science at Akure Study Centre").contains("Call your study centre on " + AKURE_PHONE).contains(wesleyHost + "/activate?matric=WU%2FODL%2F24%2F0153");
         assertThat(ngoziB.get("/api/v1/students/" + adeolaId).json().get("status").asText()).isEqualTo("INVITED");
         assertThat(ngoziB.get("/api/v1/students/" + adeolaId).json().at("/account/welcomeSentAt").asText()).isNotBlank();
         assertThat(ngoziB.get("/api/v1/students/welcome").json().at("/lastSend/status").asText()).isEqualTo("DONE");
@@ -531,6 +533,7 @@ class StudentsInJourneyTest {
         assertThat(noEmail.status()).isEqualTo(422);
         assertThat(noEmail.json().get("error").asText()).isEqualTo("no_email");
         assertThat(noEmail.json().at("/centre/name").asText()).isEqualTo("Abuja Study Centre");
+        assertThat(noEmail.json().at("/centre/phone").asText()).as("E-03 shows the centre's phone from academic-service").isEqualTo(ABUJA_PHONE);
         assertThat(ngoziB.post("/api/v1/students/" + musaId + "/resend-activation", Map.of()).status()).isEqualTo(422);
 
         // Not activated yet: sign-in and reset point to activation.

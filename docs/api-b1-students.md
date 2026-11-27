@@ -292,13 +292,13 @@ subject prefixed "Reminder: ".
 
 ### student-service uses from academic-service
 `GET /internal/academic/reference` (university in `X-Odel-Tenant-Id`, see `docs/api-b1-academic.md`):
-`{"currentSession":{"id","name","status"}|null,"sessions":[…],"programmes":[{"id","code","name","levels":[100,200,300,400],…}],"centres":[{"id","code","name"}]}`.
+`{"currentSession":{"id","name","status"}|null,"sessions":[…],"programmes":[{"id","code","name","levels":[100,200,300,400],…}],"centres":[{"id","code","name","phone"}]}`.
 Programme codes and centre codes or names are compared without regard to case; a centre also matches without "Study Centre"
 ("Akure" finds "Akure Study Centre"), and lists show that shorter name. `ODEL_ACADEMIC_LOOKUP=stub` replaces the call with built-in
 Wesley-like data (programmes `BSC-CSC-ODL`, `BSC-IFT-ODL` 100–400; centres `AKR` Akure Study Centre, `LAG` Lagos (Ikeja),
 `ABJ` Abuja Study Centre, `OND` Ondo (main campus), `IBD` Ibadan Study Centre) for running student-service on its own.
-Centre phone numbers are not in the reference data yet, so `{centre_phone}` falls back to "the number on your admission letter"
-and E-03's `centre.phone` is null; add `phone` to the reference centres and both fill in.
+`{centre_phone}` and E-03's `centre.phone` come from the reference centre's `phone`; when the centre has no phone,
+`{centre_phone}` falls back to "the number on your admission letter" and `centre.phone` is null.
 
 ### identity-service provides (to student-service)
 - `POST /internal/students/accounts` `{"accounts":[{"studentId","matricNumber","fullName","email","phone"}]}` → `{"accounts":[{"studentId","userId","created"}]}`;

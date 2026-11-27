@@ -47,7 +47,7 @@ public class InternalService {
                     Department d = depts.get(p.getDepartmentId());
                     return new ProgrammeRef(p.getId(), p.getCode(), p.getName(), p.levels(), d.getId(), d.getName(), d.getFacultyId());
                 }).toList(),
-                centres.sorted().stream().map(c -> new CentreRef(c.getId(), c.getCode(), c.getName())).toList());
+                centres.sorted().stream().map(c -> new CentreRef(c.getId(), c.getCode(), c.getName(), c.getPhone())).toList());
     }
 
     /** "CSC 201 · Computer Science", "Akure Study Centre", "Department of Computer Science", "Faculty of Science". */

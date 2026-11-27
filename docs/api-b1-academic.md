@@ -364,7 +364,8 @@ Only this university's entries; newest first; `from`/`to` are calendar days in A
 ### academic-service (:9304) provides
 - `GET /internal/academic/reference` → `{"currentSession":{"id","name","status"}|null,"sessions":[{"id","name","status"}],
   "programmes":[{"id","code","name","levels":[100,200,300,400],"departmentId","departmentName","facultyId"}],
-  "centres":[{"id","code","name"}]}`: for the students import (programme and centre codes) and the student record.
+  "centres":[{"id","code","name","phone"}]}`: for the students import (programme and centre codes), the student record,
+  `{centre_phone}` in the welcome email and the centre phone on E-03 (`phone` null when the centre has none).
 - `GET /internal/academic/scopes/{scopeType}/{id}` → `{"scopeType","id","label"}` (404 if not in this university).
 - `GET /internal/academic/scopes/resolve?scopeType=COURSE&code=CSC201` → same (404 if not found).
 - `GET /internal/academic/staffing/users/{userId}` → `{"items":[{"kind":"FACILITATOR","what":"Facilitator · CSC 201 · Akure Study Centre","session":"2026/2027","current":true}]}`.

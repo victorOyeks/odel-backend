@@ -11,7 +11,7 @@ public final class InternalDtos {
 
     public record ProgrammeRef(UUID id, String code, String name, List<Integer> levels, UUID departmentId, String departmentName, UUID facultyId) {}
 
-    public record CentreRef(UUID id, String code, String name) {}
+    public record CentreRef(UUID id, String code, String name, String phone) {}
 
     public record Reference(SessionRef currentSession, List<SessionRef> sessions, List<ProgrammeRef> programmes, List<CentreRef> centres) {}
 
