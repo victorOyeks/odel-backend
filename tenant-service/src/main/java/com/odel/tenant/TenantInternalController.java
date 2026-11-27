@@ -12,11 +12,13 @@ public class TenantInternalController {
     private final HostResolver hosts;
     private final TenantRepository tenants;
     private final CustomDomainService domains;
+    private final TenantSetupService setup;
 
-    public TenantInternalController(HostResolver hosts, TenantRepository tenants, CustomDomainService domains) {
+    public TenantInternalController(HostResolver hosts, TenantRepository tenants, CustomDomainService domains, TenantSetupService setup) {
         this.hosts = hosts;
         this.tenants = tenants;
         this.domains = domains;
+        this.setup = setup;
     }
 
     /** The server's odel-custom-domains job: which own domains need a certificate now. */
@@ -53,5 +55,13 @@ public class TenantInternalController {
     @GetMapping("/tenants/{id}")
     public TenantView tenant(@PathVariable UUID id) {
         return tenants.findById(id).map(TenantView::of).orElseThrow(ApiException::notFound);
+    }
+
+    public record PortalView(String portalUrl) {}
+
+    /** Where people should go (the university's own domain once live, else its platform address): links in emails. */
+    @GetMapping("/tenants/{id}/portal")
+    public PortalView portal(@PathVariable UUID id) {
+        return tenants.findById(id).map(t -> new PortalView(setup.portalUrl(t))).orElseThrow(ApiException::notFound);
     }
 }

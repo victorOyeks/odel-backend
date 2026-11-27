@@ -52,7 +52,7 @@ public class DevController {
         TenantInfo t = tenants.get(st.get().tenantId());
         record Person(String name, String email, String role) {}
         List<Person> people = TenantContext.runAs(t.id(), () -> tx.execute(x -> users.findAll().stream()
-                .filter(u -> u.getStatus() != User.Status.SUSPENDED)
+                .filter(u -> u.getStatus() != User.Status.SUSPENDED && u.getAuthType() == User.AuthType.GOOGLE)
                 .sorted(Comparator.comparing(User::getFullName))
                 .limit(12)
                 .map(u -> new Person(u.getFullName(), u.getEmail(), roles.findByUserIdOrderByCreatedAt(u.getId()).stream()

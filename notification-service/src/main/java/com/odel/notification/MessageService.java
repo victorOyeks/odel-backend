@@ -101,6 +101,14 @@ public class MessageService {
         return emailId;
     }
 
+    /** Many messages in one transaction (welcome emails to a whole intake). Returns each email's id, in order. */
+    @Transactional
+    public java.util.List<UUID> sendAll(java.util.List<Message> messages) {
+        java.util.List<UUID> ids = new java.util.ArrayList<>(messages.size());
+        for (Message m : messages) ids.add(send(m));
+        return ids;
+    }
+
     /** A plain, light email in the university's colour: readable on any phone, no images to download. */
     static String html(TenantLook tenant, String subject, String text) {
         String body = HtmlUtils.htmlEscape(text)
