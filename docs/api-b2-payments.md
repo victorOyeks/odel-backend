@@ -137,22 +137,49 @@ students who never paid last (by matric number).
 ### `GET /fees/students/{studentId}?semesterId=` (A-02 a student's payment record)
 `{"student":{…},"fee":<fee>,"attempts":[Payment…]}` (refund and reversal details included).
 
-### `GET /fees/settings` → `{"amount":15000,"amountLabel":"₦15,000","paymentsOpen":true}` (read-only; the provider sets it).
+### `GET /fees/settings` → read-only fee and settlement account (see the provider section). The provider sets both.
 
 ## Provider console (role SUPER_ADMIN, console host)
 
+Owner's decision (28 Nov 2026): **the provider enters each university's settlement account; the university can only view it.**
+No university endpoint changes it.
+
 ### `GET /platform/payments/universities`
-`{"items":[{"tenantId","name","amount":15000,"centreShare":3000,"providerShare":12000,"subaccount":{"code":"ACCT_…","bankName","accountNumber":"******6789","accountName","createdAt"}|null,"paymentsOpen":true}]}`.
+`{"items":[{"tenantId","name","amount":15000,"centreShare":3000,"providerShare":12000,"settlementAccount":<account>|null,"paymentsOpen":true}]}`
+where `<account>` = `{"bankCode":"058","bankName":"Guaranty Trust Bank","accountNumberMasked":"••••4521","accountName":"WESLEY UNIVERSITY ODEL CENTRE",
+"subaccountCode":"ACCT_…","since":"…","updatedBy":{"fullName":"Chuka Obi"}}`. `paymentsOpen` = a subaccount exists.
 
-### `GET /platform/payments/universities/{tenantId}` · `PUT /platform/payments/universities/{tenantId}`
-PUT `{"amount":15000,"centreShare":3000,"subaccountCode":"ACCT_x (optional: link one made in the Paystack dashboard)"}`.
-`400` with `fields`: amount 1,000 – 1,000,000; centre share 0 – amount. Audited `PAYMENT_SETTINGS_CHANGED`. A changed amount applies
-to fees nobody has started paying.
+### `GET /platform/payments/universities/{tenantId}` → one item as above (SA-01b "Payments" card).
 
-### `POST /platform/payments/universities/{tenantId}/subaccount` `{"bankCode":"058","accountNumber":"0123456789","businessName":"Wesley University ODeL Centre"}`
-Creates the university's Paystack subaccount (fake mode: a fake `ACCT_FAKE…` code) and stores it. `502 gateway_error` with Paystack's
-message when Paystack refuses (e.g. account cannot be resolved). Audited `PAYMENT_SUBACCOUNT_CREATED`.
-`GET /platform/payments/banks` → `{"items":[{"code":"058","name":"Guaranty Trust Bank"}…]}` (Paystack's list of Nigerian banks).
+### `PUT /platform/payments/universities/{tenantId}` `{"amount":15000,"centreShare":3000}` (fee and the centre's flat share)
+`400` with `fields`: amount 1,000 – 1,000,000; centre share 0 – amount. Audited `PAYMENT_SETTINGS_CHANGED` (old and new). A changed amount
+applies to fees nobody has started paying. When a subaccount exists, Paystack's subaccount is not touched (the share is sent per
+transaction).
+
+### `GET /platform/payments/banks` → `{"items":[{"code":"058","name":"Guaranty Trust Bank"}…]}`
+Nigerian banks from Paystack (`GET /bank?country=nigeria`, cached for a day; fake mode: a fixed list including Paystack's test bank).
+
+### `POST /platform/payments/banks/resolve` `{"bankCode":"058","accountNumber":"0123454521"}` (the wizard's Verify)
+→ `{"bankCode","bankName","accountNumberMasked":"••••4521","accountName":"WESLEY UNIVERSITY ODEL CENTRE","resolutionId":"uuid"}`.
+`400` `fields.accountNumber` "Enter the 10-digit account number." · `422 {"error":"not_resolved"}` "The bank could not find that account.
+Check the number and the bank." A POST so the number never sits in a URL or access log; the result is remembered for 15 minutes.
+
+### `PUT /platform/payments/universities/{tenantId}/settlement-account` `{"resolutionId":"uuid","confirmedAccountName":"WESLEY UNIVERSITY ODEL CENTRE"}`
+SA-04 step 3 "Rules and payments" and SA-01b. Saving needs a successful resolve in the last 15 minutes (`409 resolve_first` "Verify the
+account number first.") and the provider confirming the name it returned (`400 fields.confirmedAccountName` "Confirm the account name
+the bank returned."). Creates the Paystack subaccount (`POST /subaccount`), or updates the existing one (`PUT /subaccount/{code}`) on a
+change, with business name = the university's name; stores the code per university → the item above. `502 gateway_error` with
+Paystack's message when it refuses. Audited `PAYMENT_ACCOUNT_SET` / `PAYMENT_ACCOUNT_CHANGED` with who and when, old and new as
+"bank ••••last 4" only (full numbers are never in the audit log or the logs: `accountNumber` / `account_number` are masked by
+BodyLoggingFilter).
+
+### University's read-only view (ODEL_ADMIN, ODEL_DIRECTOR, MANAGEMENT): `GET /fees/settings`
+`{"amount":15000,"amountLabel":"₦15,000","paymentsOpen":true,"settlementAccount":{"bankName","accountNumberMasked":"••••4521","accountName","since"}|null}`
+(no subaccount code, no split).
+
+Dev: on first start (profile dev), any university with slug `wesley` and no account gets one automatically (devseed): fake mode a fake
+`ACCT_FAKE…` code; paystack mode Paystack's test bank (`ODEL_PAYSTACK_TEST_BANK_CODE`, default `001`; `ODEL_PAYSTACK_TEST_ACCOUNT`,
+default `0000000000`). The seed retries every 10 minutes until Wesley exists.
 
 ### `GET /platform/payments/settlement?from=2026-12-01&to=2026-12-31&tenantId=&page=&size=` (settlement report)
 ```json
@@ -222,10 +249,10 @@ The fake gateway keeps its transactions in memory and posts **signed** webhooks 
 
 ## Audit actions
 `PAYMENT_STARTED`, `PAYMENT_PAID`, `PAYMENT_FAILED`, `PAYMENT_DUPLICATE_REFUND_STARTED`, `PAYMENT_REFUNDED`, `PAYMENT_REVERSED`,
-`PAYMENT_SETTINGS_CHANGED`, `PAYMENT_SUBACCOUNT_CREATED` (university's audit log, type `OTHER`).
+`PAYMENT_SETTINGS_CHANGED`, `PAYMENT_ACCOUNT_SET`, `PAYMENT_ACCOUNT_CHANGED` (university's audit log, type `OTHER`).
 
 ## Environment
 `ODEL_PAYSTACK_MODE` (`fake` | `paystack`; default `fake`), `ODEL_PAYSTACK_SECRET_KEY` (signature and API), `ODEL_PAYSTACK_PUBLIC_KEY`
 (unused: hosted checkout), `ODEL_PAYSTACK_BASE_URL` (default `https://api.paystack.co`), `ODEL_PAYMENT_DEFAULT_FEE` (15000),
 `ODEL_PAYMENT_CENTRE_SHARE` (3000), `ODEL_PAYMENTS_URL` (other services → payment-service, default `http://127.0.0.1:9306`),
-dev seed: `ODEL_PAYSTACK_TEST_BANK_CODE` / `ODEL_PAYSTACK_TEST_ACCOUNT` for Wesley's test-mode subaccount.
+dev seed: `ODEL_PAYSTACK_TEST_BANK_CODE` / `ODEL_PAYSTACK_TEST_ACCOUNT` / `ODEL_PAYMENT_SEED_SLUG` (default `wesley`) for Wesley's test-mode subaccount.
