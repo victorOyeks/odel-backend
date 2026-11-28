@@ -62,4 +62,22 @@ public class IdentityClient {
     public StaffView staff(UUID userId) {
         return internal.get(S, "/internal/users/" + userId, StaffView.class);
     }
+
+    /** B3: the student's password, before a phone change (L-14b). Wrong → 401 wrong_password / 423 locked, relayed as they are. */
+    public void checkPassword(UUID userId, String password) {
+        try {
+            java.util.Map<String, String> body = new java.util.HashMap<>();
+            body.put("password", password);
+            internal.post(S, "/internal/students/accounts/" + userId + "/check-password", body, Void.class);
+        } catch (com.odel.common.ApiException e) {
+            throw Upstream.relay(e);
+        }
+    }
+
+    /** B3: the ODeL admins, for the bell when a correction or photo is waiting. */
+    @SuppressWarnings("unchecked")
+    public List<java.util.Map<String, Object>> staffWithRole(String role) {
+        List<java.util.Map<String, Object>> out = internal.get(S, "/internal/staff?role=" + role, List.class);
+        return out == null ? List.of() : out;
+    }
 }

@@ -29,4 +29,8 @@ public interface StudentRepository extends JpaRepository<Student, UUID>, JpaSpec
     Optional<Student> findFirstByEmailIgnoreCase(String email);
 
     long countByStatus(Student.Status status);
+
+    /** B3 review list search: name (either order) or matric number. */
+    @Query("select s.id from Student s where lower(concat(concat(s.firstName, ' '), s.surname)) like ?1 or lower(concat(concat(s.surname, ' '), s.firstName)) like ?1 or s.matricNumber like ?2")
+    List<UUID> searchIds(String nameLike, String matricLike);
 }
