@@ -164,8 +164,9 @@ with `"protocol":"PUT"`.
 item. For a video still `UPLOADING` the same Bunny video is kept (TUS resumes); after a `FAILED` encoding a new Bunny video is made and the
 failed one deleted.
 
-### `POST /content/items/{id}/replace` (T-03l) `{"fileName","contentType","sizeBytes"}` → `{"item","upload"}`
-Uploads a new file for the item. Students keep the old file until the new one is ready; then it takes its place (same item, same position,
+### `POST /content/items/{id}/replace` (T-03l) `{"fileName","contentType","sizeBytes"}` → `200 {"item","upload"}`
+Uploads a new file for the item (a video for a video; any document or audio file for a document). `POST /content/items/{id}/uploaded`
+with the **item's** id finishes it. Students keep the old file until the new one is ready; then it takes its place (same item, same position,
 students' progress kept) and the old file or video is deleted. While waiting the staff item shows `replacement:{"status","statusLabel"}`.
 
 ### `PUT /content/items/{id}` (rename T-03e, edit a link or page) `{"title","url","note","warnData","body"}` → the item.
@@ -240,13 +241,13 @@ Every item says its data cost (`dataCost`): videos the 360p size and the audio s
 pages "under 10 KB". Items not ready (`PROCESSING`, `FAILED`, `CONVERTING`) show `ready:false`, "Not ready". Hidden items are left out.
 
 ### `GET /content/me/items/{id}` (L-06 video, L-08 audio, L-09 PDF, L-09b page, L-05b link)
-The item (student view) plus, by kind:
+`{"item":<Item, student view>,"week":{"id","number","title"},"next":{"id","title","kind"}|null, …}` plus, by kind:
 - `VIDEO`: `playback` as below (or `playback:null` with `notReady` when not ready).
 - `AUDIO`, `PDF`, `SLIDES`, `NOTES`: `file:{"url":"<signed link, 30 minutes>","contentType","sizeBytes","sizeLabel","name","converted":true}`.
 - `PAGE`: `body`. `LINK`: `url`, `note`, `warning`: "This leaves the portal and uses your mobile data."
-- `next`: the next item of the week (`{"id","title","kind"}`) or null; `week`: `{"id","number","title"}`.
+- `next`: the next item of the week or null.
 
-Video not ready → the item with `notReady:{"code":"video_preparing","message":"Being prepared. Dr Funmi Bello uploaded it 20 minutes ago; check back in about 20 minutes."}` (E-10)
+Video not ready → `playback:null` and `notReady:{"code":"video_preparing","message":"Being prepared. Dr Funmi Bello uploaded it 20 minutes ago; check back in about 20 minutes."}` (E-10)
 or `{"code":"video_failed","message":"This lecture could not be prepared. Dr Funmi Bello has been told and will upload it again."}`.
 
 ### `GET /content/me/items/{id}/playback` (video player, L-06, L-07, L-08; FR-5.2–5.4)
@@ -255,11 +256,12 @@ or `{"code":"video_failed","message":"This lecture could not be prepared. Dr Fun
  "auto":{"hlsUrl":"https://<cdn>/bcdn_token=…/<videoId>/playlist.m3u8"},
  "qualities":[{"quality":"240p","sizeBytes":…,"sizeLabel":"28 MB","perMinuteLabel":"about 1.5 MB a minute","hlsUrl","mp4Url"},
               {"quality":"360p","default":true,…},{"quality":"480p",…}],
- "audio":{"kind":"AUDIO_FILE","url","sizeBytes","sizeLabel":"7 MB","perMinuteLabel":"about 0.4 MB a minute","saving":"saves about 80% of the data"},
+ "audio":{"kind":"AUDIO_FILE","url","sizeBytes","sizeLabel":"6.2 MB","perMinuteLabel":"about 0.3 MB a minute","saving":"saves about 85% of the data"},
  "speeds":[1,1.25,1.5,2],"embedUrl":"https://iframe.mediadelivery.net/embed/<lib>/<videoId>?token=…&expires=…"}
 ```
 Signed, expiring links (4 hours). `audio.kind`: `AUDIO_FILE` (a 48 kbps mono AAC file made from the 240p rendition, served from storage) or
-`VIDEO_LOW` (no audio file yet: play the 240p stream with the picture hidden). `403 not_registered` for anyone not registered.
+`VIDEO_LOW` (no audio file: play the 240p stream with the picture hidden; `saving` then reads "plays the 240p stream without the picture").
+The sizes are the host's MP4 sizes when it has them (Bunny's MP4 fallback), else estimates (240p 1.5, 360p 2.3, 480p 4.0 MB a minute). `403 not_registered` for anyone not registered.
 
 ### `POST /content/me/items/{id}/progress` (player heartbeat every 15–30 s and on pause/leave)
 `{"positionSeconds":438,"fromSeconds":422,"toSeconds":438,"mode":"VIDEO|AUDIO","speed":1.5}` → `{"done":false,"percentWatched":40,"watchedSeconds":…}`.
