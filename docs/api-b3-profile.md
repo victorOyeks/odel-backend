@@ -8,7 +8,8 @@ the student record's change history (W-22b) and the emails that tell the student
 
 Same conventions as `docs/api-b0.md`: paths start with `/api/v1`, `X-Odel-Host` on every call, CSRF header on every non-GET,
 errors `{"error","message","fields"}`, lists `{"items","page","size","total"}`, dates `YYYY-MM-DD`, times ISO-8601 (UTC; the web
-shows Africa/Lagos). Ids from another university → `404`.
+shows Africa/Lagos). Ids from another university → `404`. As everywhere, **null fields are left out** of responses
+(`"photo":null` in the examples below means the key is absent).
 
 ## Services and routes
 
@@ -76,8 +77,8 @@ Any of:
  "nextOfKin":{"name":"Mrs Chioma Okafor","relationship":"Mother","phone":"0805 111 2233"}}
 ```
 → the profile. Only the parts sent change; `"address":null` / `"nextOfKin":null` clear them.
-- **Phone** needs `password` (the student's current password, "To confirm it is you"), except within one hour of activation
-  (M-06 "Check your details" right after the privacy notice, where she has just set it). Empty string clears the phone.
+- **Phone** needs `password` (the student's current password, "To confirm it is you"), except for her **first** phone save within
+  one hour of activation (M-06 "Check your details" right after the privacy notice, where she has just set it); every later change asks. Empty string clears the phone.
   Nigerian mobile numbers only, stored as `0816 555 2290`.
 - `400 invalid` with `fields.phone` "Enter a Nigerian mobile number, like 0803 412 4417.", `fields.password` "Enter your password
   to confirm it is you.", `fields["address.line"]` (up to 200), `town` (up to 100), `state` (one of the 36 states and FCT, any case),
@@ -110,7 +111,7 @@ email-change codes count together), **3 wrong tries** then a fresh code is sent 
 ### `POST /me/email-change` `{"newEmail":"adeola.okafor@yahoo.com","password":"…"}` (L-14d "Send code")
 - `200`:
   ```json
-  {"changeId":"opaque","maskedEmail":"adeola.o•••@yahoo.com","codeSent":true,"expiresInSeconds":900,"resendInSeconds":60,"sendsLeftThisHour":4}
+  {"changeId":"opaque","maskedEmail":"a•••••@yahoo.com","codeSent":true,"expiresInSeconds":900,"resendInSeconds":60,"sendsLeftThisHour":4}
   ```
   The code goes to the **new** address (`student.email_change_code`). Nothing changes yet: sign-in, receipts and codes still use
   the old address until the code is entered. Asking again for the same address within 60 seconds returns the same `changeId`
@@ -124,9 +125,9 @@ email-change codes count together), **3 wrong tries** then a fresh code is sent 
 change is over 30 minutes old.
 
 ### `POST /me/email-change/verify` `{"changeId","code":"472913"}` (L-14e)
-- `200 {"email":"adeola.okafor@yahoo.com","maskedEmail":"adeola.o•••@yahoo.com","changedAt":"…"}` — done: the account signs in
+- `200 {"email":"adeola.okafor@yahoo.com","maskedEmail":"a•••••@yahoo.com","changedAt":"…"}` — done: the account signs in
   with the new address from now on, student-service's record shows it, and:
-  - the **old** address gets `student.email_changed_old` ("Your email was changed to adeola.o•••@yahoo.com … If this was not you,
+  - the **old** address gets `student.email_changed_old` ("Your email was changed to a•••••@yahoo.com … If this was not you,
     contact the ODeL office at once: your account can be locked while they check.");
   - the **new** address gets `student.email_changed` (and a bell): "From now on receipts, codes and announcements come here."
   - other browsers stay signed in (the password did not change).
@@ -189,7 +190,7 @@ As for the photo; JPG, PNG or PDF up to **5 MB** (`fields.size` "The file is ove
 `field` ("What is wrong"): `SURNAME` "Surname spelling", `FIRST_NAME` "First name spelling", `OTHER_NAMES` "Other names",
 `DATE_OF_BIRTH` "Date of birth", `GENDER` "Gender". `requestedValue` ("Should be"): a name (letters, spaces, hyphens and
 apostrophes, up to 100; other names up to 150 and may be empty), a date `YYYY-MM-DD` (age 14–100), or `M` / `F`.
-`GET /student-profile/correction-fields` → `[{"key":"SURNAME","label":"Surname spelling","current":"Okafor"}, …]` (the dropdown and "On record now").
+`GET /student-profile/correction-fields` → `[{"key":"SURNAME","label":"Surname spelling","current":"Okafor"}, …]` (the dropdown and "On record now"; gender's `current` is "Male" / "Female").
 → `201` the request. Errors: `400 invalid` with `fields.field` "Choose what is wrong.", `fields.requestedValue`, `fields.note`
 (up to 500), `fields.proof` "Add a document that shows the right spelling (proof is required)." / "Upload the file again.";
 `400 no_change` "That is what we have on record now."; `409 request_pending` "You already asked to correct your surname. Wait for
@@ -221,13 +222,15 @@ Default `status=PENDING`, oldest first for pending (first come, first served), n
            "centre":{"code","name","shortName"}},"hasProof":true}],
  "page":0,"size":25,"total":3,"counts":{"pending":3,"corrections":2,"photos":1}}
 ```
-### `GET /students/profile-requests/{id}` → the request with `student` and, for `PHOTO`, `currentPhotoUrl` and `newPhotoUrl` (side by side).
+### `GET /students/profile-requests/{id}` (the "detail body")
+`{"request":<the request>,"student":{"id","matricNumber","fullName","centre"},"currentPhotoUrl","newPhotoUrl"}`; the photo links
+(10 minutes, side by side) only for `PHOTO`.
 ### `GET /students/profile-requests/{id}/proof` → `{"url","expiresAt"}`.
-### `POST /students/profile-requests/{id}/approve` `{"note":null}` → the request (`APPROVED`).
+### `POST /students/profile-requests/{id}/approve` `{"note":null}` → the detail body above (`request.status` `APPROVED`).
 Applies the change at once: the record (and the account's name in identity-service) for names; date of birth; gender; the photo.
 Exam slips, results and lists use the new value from then on. `student.request_approved` email + bell + push.
 ### `POST /students/profile-requests/{id}/decline` `{"note":"The birth certificate photo is not readable. Upload a clearer copy."}`
-→ the request (`DECLINED`). Note required (5–500). `student.request_declined` email + bell + push with the note.
+→ the detail body (`request.status` `DECLINED`). Note required (5–500). `student.request_declined` email + bell + push with the note.
 Errors for both: `403 forbidden` (not ODeL admin), `404`, `409 not_pending` "This request was already approved by Mrs Ngozi Adebayo."
 Audited `STUDENT_PROFILE_REQUEST_APPROVED` / `_DECLINED`.
 
@@ -241,7 +244,7 @@ Audited `STUDENT_PROFILE_REQUEST_APPROVED` / `_DECLINED`.
 (W-22b edit). Next-of-kin and address values are shown as one line ("Mrs Chioma Okafor (Mother) · 0805 111 2233").
 B1's `PATCH /students/{id}` now also writes these rows and emails the student when the office changes her email or phone
 (`student.contact_changed`, "by the ODeL office").
-`W-22b` record (`GET /students/{id}`) gains `address`, `nextOfKin`, `photo` (signed link or null) and `openRequests` (count).
+`W-22b` record (`GET /students/{id}`) gains `address`, `nextOfKin`, `photo` (`{"url","updatedAt"}`, signed link) and `openRequests` (a count).
 
 ---
 
@@ -278,10 +281,14 @@ identity-service: `STUDENT_EMAIL_CHANGE_CODE_SENT`, `STUDENT_EMAIL_CHANGED`, `ST
 - **Address and next of kin** are not drawn on L-14; they are added to the API (self-service). The web needs two rows on the
   "Contact and security" card (or a "Personal details" card) with a small edit dialog each.
 - **Photo changes need the ODeL office's approval** (the design shows an instant change): the photo is how the invigilator
-  recognises the student on the exam slip and attendance list, so letting anyone with her password swap it is a
+  recognises the student on the exam slip and attendance list, so letting anyone with her password swap it is an
   impersonation risk. L-14h needs a "Waiting for the ODeL office" state.
 - **Recovery codes are shown once.** L-14g "View" lists the codes again; we keep only hashes (like staff backup codes), so "View"
   shows how many are left and "Make new codes" shows the new set once. They are used on the forgot-password screen (new endpoint
   above), which D1's M-09/M-10 do not draw: the web needs a "Use a recovery code" link on M-10/E-03.
 - **Gender** is added to the correction dropdown (it is on the record and on the transcript).
 - **No staff screen** is drawn for the review: the API follows B2's approvals queue (A-03 pattern).
+
+## Tests
+- Unit: `ProfileRulesTest` (student-service), `ProfileFormatTest` (identity-service).
+- Journey: `e2e-tests/.../ProfileJourneyTest` (12 steps through the gateway; see the class comment).

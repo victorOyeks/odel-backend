@@ -10,4 +10,6 @@ import java.util.UUID;
 /** Tenant-scoped: every query only sees the current university's history. */
 public interface ProfileChangeRepository extends JpaRepository<ProfileChange, UUID> {
     Page<ProfileChange> findByStudentIdOrderByCreatedAtDesc(UUID studentId, Pageable page);
+
+    boolean existsByStudentIdAndFieldAndSource(UUID studentId, String field, ProfileChange.Source source);
 }

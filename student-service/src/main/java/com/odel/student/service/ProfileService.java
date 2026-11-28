@@ -43,6 +43,7 @@ public class ProfileService {
     private final StudentRepository students;
     private final ProfileRequestRepository requests;
     private final ProfileHistory history;
+    private final com.odel.student.repository.ProfileChangeRepository changes;
     private final IdentityClient identity;
     private final StorageService storage;
     private final AuditService audit;
@@ -50,7 +51,9 @@ public class ProfileService {
     private final Clock clock;
 
     public ProfileService(StudentRepository students, ProfileRequestRepository requests, ProfileHistory history, IdentityClient identity,
-                          StorageService storage, AuditService audit, TransactionTemplate tx, Clock clock) {
+                          StorageService storage, AuditService audit, TransactionTemplate tx, Clock clock,
+                          com.odel.student.repository.ProfileChangeRepository changes) {
+        this.changes = changes;
         this.students = students;
         this.requests = requests;
         this.history = history;
@@ -146,8 +149,10 @@ public class ProfileService {
         return tx.execute(t -> view(students.findInTenant(s.getId()).orElseThrow()));
     }
 
+    /** M-06: the first phone save within an hour of activation needs no password (she has just set it); every later change does. */
     private boolean justActivated(Student s) {
-        return s.getActivatedAt() != null && s.getActivatedAt().plus(FIRST_PROFILE).isAfter(clock.instant());
+        return s.getActivatedAt() != null && s.getActivatedAt().plus(FIRST_PROFILE).isAfter(clock.instant())
+                && !tx.execute(t -> changes.existsByStudentIdAndFieldAndSource(s.getId(), "PHONE", ProfileChange.Source.STUDENT));
     }
 
     private static Address address(Object raw, Map<String, String> f) {
