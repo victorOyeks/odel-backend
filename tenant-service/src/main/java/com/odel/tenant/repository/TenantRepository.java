@@ -19,5 +19,8 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     Optional<Tenant> findByWebAddressIgnoreCase(String webAddress);
     boolean existsBySlug(String slug);
     boolean existsByWebAddressIgnoreCase(String webAddress);
+    /** Names compare without case and with runs of spaces treated as one (QA ODEL-B0-002). */
+    @org.springframework.data.jpa.repository.Query(value = "select * from tenants where lower(regexp_replace(trim(name), '\\s+', ' ', 'g')) = lower(:name) limit 1", nativeQuery = true)
+    Optional<Tenant> findByNormalisedName(@org.springframework.data.repository.query.Param("name") String name);
     List<Tenant> findByKindOrderByCreatedAtDesc(Tenant.Kind kind);
 }

@@ -138,8 +138,8 @@ Status: `NOT_STARTED | IN_PROGRESS | DONE | LOCKED`. In B0 every step is empty (
 ### `GET /platform/tenants` (SA-01)
 `{"items":[{"id","name","shortName","slug","webAddress","status","students":0,"centres":0,"createdAt","firstAdmin":{"fullName","email","accepted":false}}]}`. Empty platform → `items: []` (SA-01 empty state).
 
-### `GET /platform/tenants/address-available?webAddress=odl.crestfield.edu.ng&slug=crestfield`
-`{"webAddress":{"available":false,"message":"odl.crestfield.edu.ng is already used by Crestfield University"},"slug":{"available":true}}` (SA-02b).
+### `GET /platform/tenants/address-available?webAddress=odl.crestfield.edu.ng&slug=crestfield&name=Crestfield%20University`
+`{"name":{"available":true},"webAddress":{"available":false,"message":"odl.crestfield.edu.ng is already used by Crestfield University"},"slug":{"available":true}}` (SA-02b). Each part is checked only when its parameter is sent. `name` compares without case and with runs of spaces as one.
 
 ### `POST /platform/logo-uploads` `{"fileName":"crest.svg","contentType":"image/svg+xml","size":20480}`
 `{"key":"logos/…","uploadUrl":"https://…","method":"PUT","headers":{"Content-Type":"image/svg+xml"},"expiresAt":"…"}`. The browser PUTs the file straight to storage. Allowed: SVG or PNG, at most 2 MB.
@@ -156,8 +156,9 @@ Status: `NOT_STARTED | IN_PROGRESS | DONE | LOCKED`. In B0 every step is empty (
 ```
 - `201` → tenant detail (below). The first admin gets role `ODEL_ADMIN` and an invitation email; the audit trail gets "Created Wesley University; invited Ngozi Adebayo".
 - `409 {"error":"web_address_taken"|"slug_taken"}`.
+- `409 {"error":"name_taken","fields":{"name":"Wesley University is already on the platform (wesley). Open it from the universities list instead of adding it again."}}`: another university has this full name (case and extra spaces ignored). The same first-admin email at two universities is allowed: accounts belong to one university each.
 - `422 {"error":"contrast","fields":{"primaryColor":"White text on #F5D76E is 1.6 : 1; it needs 4.5 : 1"}}` (SA-03b). The check: white text on the primary colour must reach 4.5 : 1 (WCAG relative luminance). The web app runs the same check live.
-- `400` with `fields` for missing or invalid values (email must be in `googleDomain`; slug `^[a-z][a-z0-9-]{1,30}$`).
+- `400` with `fields` for missing or invalid values (email must be in `googleDomain`; slug `^[a-z][a-z0-9-]{1,30}$`; `name`, `shortName` and `firstAdmin.fullName` need at least one letter, so `11111` is refused). `PATCH /platform/tenants/{id}` applies the same letter and unique-name rules to `name` and `shortName` (as `400` field errors).
 
 Rules and payments (SA-04) are not in B0: universities get the default rules, set later by their admin.
 

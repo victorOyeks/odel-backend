@@ -64,7 +64,7 @@ class StudentsInJourneyTest {
 
     String createUniversity(String name, String shortName, String slug, String domain, String admin, String adminEmail, String primary) {
         Map<String, Object> u = new LinkedHashMap<>();
-        u.put("name", name);
+        u.put("name", name + " (" + slug + ")");
         u.put("shortName", shortName);
         u.put("slug", slug);
         u.put("googleDomain", domain);

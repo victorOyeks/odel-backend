@@ -83,7 +83,7 @@ class AcademicSetupJourneyTest {
     }
 
     Map<String, Object> university(String name, String shortName, String s, String d, String adminName, String adminEmail) {
-        return Map.of("name", name, "shortName", shortName, "slug", s, "googleDomain", d,
+        return Map.of("name", name + " (" + s + ")", "shortName", shortName, "slug", s, "googleDomain", d,
                 "firstAdmin", Map.of("fullName", adminName, "email", adminEmail),
                 "branding", Map.of("primaryColor", "#1A2368", "accentColor", "#C27808"));
     }

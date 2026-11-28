@@ -79,8 +79,9 @@ public class PlatformController {
 
     @GetMapping("/tenants/address-available")
     public Map<String, PlatformDtos.Availability> available(@RequestParam(required = false) String webAddress,
-                                                                  @RequestParam(required = false) String slug) {
-        return setup.availability(webAddress, slug);
+                                                                  @RequestParam(required = false) String slug,
+                                                                  @RequestParam(required = false) String name) {
+        return setup.availability(webAddress, slug, name);
     }
 
     @PostMapping("/tenants")

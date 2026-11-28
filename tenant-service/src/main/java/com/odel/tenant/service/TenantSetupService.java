@@ -61,8 +61,13 @@ public class TenantSetupService {
 
     static final String RESERVED_MESSAGE = "Use a real domain the university controls; test domains like .test or example.com can never be reached.";
 
-    public Map<String, Availability> availability(String webAddress, String slug) {
+    public Map<String, Availability> availability(String webAddress, String slug, String name) {
         Map<String, Availability> out = new LinkedHashMap<>();
+        if (name != null && !name.isBlank()) {
+            out.put("name", nameOwner(name, null)
+                    .map(t -> new Availability(false, nameTakenMessage(t)))
+                    .orElse(new Availability(true, null)));
+        }
         if (webAddress != null && !webAddress.isBlank()) {
             String w = webAddress.trim().toLowerCase(Locale.ROOT);
             out.put("webAddress", tenants.findByWebAddressIgnoreCase(w)
@@ -96,6 +101,9 @@ public class TenantSetupService {
         if (web != null && tenants.existsByWebAddressIgnoreCase(web)) {
             throw new ApiException(HttpStatus.CONFLICT, "web_address_taken", web + " is already used by another university.");
         }
+        nameOwner(in.name(), null).ifPresent(t -> {
+            throw ApiException.fields(HttpStatus.CONFLICT, "name_taken", nameTakenMessage(t), Map.of("name", nameTakenMessage(t)));
+        });
 
         Instant now = clock.instant();
         Tenant t = new Tenant();
@@ -149,7 +157,12 @@ public class TenantSetupService {
                     "accentColor", t.getAccentColor(), "logoKey", t.getLogoKey() == null ? "" : t.getLogoKey());
             Map<String, String> fields = new LinkedHashMap<>();
             if (in.name() != null && in.name().isBlank()) fields.put("name", "Enter the university's name.");
+            else if (in.name() != null && !hasLetter(in.name())) fields.put("name", NEEDS_LETTERS);
             if (in.shortName() != null && in.shortName().isBlank()) fields.put("shortName", "Enter a short name.");
+            else if (in.shortName() != null && !hasLetter(in.shortName())) fields.put("shortName", NEEDS_LETTERS);
+            if (in.name() != null && !in.name().isBlank()) {
+                nameOwner(in.name(), t.getId()).ifPresent(other -> fields.put("name", nameTakenMessage(other)));
+            }
             Branding b = in.branding();
             if (b != null) {
                 if (b.primaryColor() != null && !Contrast.isHex(b.primaryColor())) fields.put("primaryColor", "Enter a colour like #1A2368.");
@@ -242,7 +255,9 @@ public class TenantSetupService {
     private Map<String, String> validate(NewUniversity in) {
         Map<String, String> f = new LinkedHashMap<>();
         if (blank(in.name())) f.put("name", "Enter the university's name.");
+        else if (!hasLetter(in.name())) f.put("name", NEEDS_LETTERS);
         if (blank(in.shortName())) f.put("shortName", "Enter a short name, for example Wesley ODeL.");
+        else if (!hasLetter(in.shortName())) f.put("shortName", NEEDS_LETTERS);
         if (blank(in.slug()) || !in.slug().trim().toLowerCase(Locale.ROOT).matches(SLUG))
             f.put("slug", "Use 2 to 31 lowercase letters, numbers or hyphens, starting with a letter.");
         if (!blank(in.webAddress()) && !in.webAddress().trim().toLowerCase(Locale.ROOT).matches(HOST))
@@ -257,12 +272,31 @@ public class TenantSetupService {
             f.put("logoKey", "Upload the logo again.");
         FirstAdmin a = in.firstAdmin();
         if (a == null || blank(a.fullName())) f.put("firstAdmin.fullName", "Enter the first admin's name.");
+        else if (!hasLetter(a.fullName())) f.put("firstAdmin.fullName", "Enter the first admin's real name, in letters.");
         if (a == null || blank(a.email()) || !a.email().trim().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
             f.put("firstAdmin.email", "Enter the first admin's email.");
         } else if (!blank(in.googleDomain()) && !a.email().trim().toLowerCase(Locale.ROOT).endsWith("@" + in.googleDomain().trim().toLowerCase(Locale.ROOT))) {
             f.put("firstAdmin.email", "Use an @" + in.googleDomain().trim().toLowerCase(Locale.ROOT) + " address: staff sign in with the university's Google accounts.");
         }
         return f;
+    }
+
+    static final String NEEDS_LETTERS = "Use letters: a name cannot be only numbers or symbols.";
+
+    /** QA ODEL-B0-003: a name has at least one letter (any alphabet), so 11111 or --- is refused. */
+    static boolean hasLetter(String s) {
+        return s != null && s.codePoints().anyMatch(Character::isLetter);
+    }
+
+    /** QA ODEL-B0-002: another university already using this name (case and extra spaces ignored). */
+    private java.util.Optional<Tenant> nameOwner(String name, UUID except) {
+        if (name == null || name.isBlank()) return java.util.Optional.empty();
+        return tenants.findByNormalisedName(name.trim().replaceAll("\\s+", " "))
+                .filter(t -> except == null || !t.getId().equals(except));
+    }
+
+    private static String nameTakenMessage(Tenant t) {
+        return t.getName() + " is already on the platform (" + t.getSlug() + "). Open it from the universities list instead of adding it again.";
     }
 
     private static boolean blank(String s) {

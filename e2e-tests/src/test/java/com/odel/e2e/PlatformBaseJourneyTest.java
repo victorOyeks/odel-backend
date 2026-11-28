@@ -88,7 +88,7 @@ class PlatformBaseJourneyTest {
 
     Map<String, Object> university(String name, String shortName, String slug, String domain, String admin, String adminEmail, String primary, String accent) {
         Map<String, Object> u = new LinkedHashMap<>();
-        u.put("name", name);
+        u.put("name", name + " (" + slug + ")"); // names are unique on the platform; the run's slug keeps reruns apart
         u.put("shortName", shortName);
         u.put("slug", slug);
         u.put("googleDomain", domain);
@@ -140,6 +140,26 @@ class PlatformBaseJourneyTest {
         assertThat(created.json().at("/firstAdmin/accepted").asBoolean()).isFalse();
         assertThat(created.json().at("/createdBy/fullName").asText()).isNotBlank();
         assertThat(chuka.post("/api/v1/platform/tenants", wesley).status()).isEqualTo(409);
+
+        // QA ODEL-B0-002: the same name with a new short address is refused (case and spaces ignored), on step 1 and on create.
+        String sameName = "  " + ((String) wesley.get("name")).toUpperCase().replace(" ", "  ") + " ";
+        assertThat(chuka.get("/api/v1/platform/tenants/address-available?slug=" + wesleySlug + "x&name=" + java.net.URLEncoder.encode(sameName, java.nio.charset.StandardCharsets.UTF_8))
+                .json().at("/name/available").asBoolean()).isFalse();
+        Map<String, Object> twin = university("x", "Wesley ODeL", wesleySlug + "x", wesleyDomain, "Ngozi Adebayo", ngozi, "#1A2368", "#C27808");
+        twin.put("name", sameName);
+        Browser.Res dup = chuka.post("/api/v1/platform/tenants", twin);
+        assertThat(dup.status()).as(dup.body()).isEqualTo(409);
+        assertThat(dup.json().get("error").asText()).isEqualTo("name_taken");
+        assertThat(dup.json().at("/fields/name").asText()).contains("already on the platform");
+
+        // QA ODEL-B0-003: names made only of numbers are refused.
+        Map<String, Object> digits = university("x", "11111", wesleySlug + "y", wesleyDomain, "11111", ngozi, "#1A2368", "#C27808");
+        digits.put("name", "11111");
+        Browser.Res bad = chuka.post("/api/v1/platform/tenants", digits);
+        assertThat(bad.status()).as(bad.body()).isEqualTo(400);
+        assertThat(bad.json().at("/fields").has("name")).isTrue();
+        assertThat(bad.json().at("/fields").has("shortName")).isTrue();
+        assertThat(bad.json().at("/fields").has("firstAdmin.fullName")).isTrue();
 
         // The invitation email goes out (dev: logged, readable at /api/v1/dev/emails).
         JsonNode email = null;

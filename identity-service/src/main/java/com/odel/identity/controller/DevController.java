@@ -123,12 +123,12 @@ public class DevController {
                     <span class="tag">Development sign-in</span>
                     <h1>Choose an account</h1>
                     <p class="lead">to continue to %1$s. On the dev site this page stands in for Google; you still confirm with your two-step code next.</p>
-                    <form method="post" action="/api/v1/auth/dev/google">
+                    <form method="post" action="/api/v1/auth/dev/google" onsubmit="if(window.odelSent)return false;window.odelSent=true">
                       <input type="hidden" name="state" value="%6$s">
                       <div class="list">%7$s</div>
                     </form>
                     <div class="or">or use another email</div>
-                    <form method="post" action="/api/v1/auth/dev/google">
+                    <form method="post" action="/api/v1/auth/dev/google" onsubmit="if(window.odelSent)return false;window.odelSent=true">
                       <input type="hidden" name="state" value="%6$s">
                       <label for="email">Google account email</label>
                       <div class="row"><input id="email" name="email" type="email" required autocomplete="email" placeholder="%8$s"><button class="go" type="submit">Continue</button></div>
@@ -148,10 +148,16 @@ public class DevController {
     }
 
     @PostMapping(value = "/api/v1/auth/dev/google", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public ResponseEntity<Void> pick(@RequestParam String state, @RequestParam String email) {
+    public ResponseEntity<Void> pick(@RequestParam String state, @RequestParam String email, jakarta.servlet.http.HttpServletRequest request) {
         String target = signIn.devCallback(state, email);
-        if (target == null) return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(target)).build();
+        if (target == null) {
+            // The sign-in state was already used (a second click or a resubmitted form) or has expired: send the
+            // person back to the sign-in page with "start again" instead of a bare error page (QA ODEL-B0-001).
+            ResolvedHost host = TenantFilter.resolved(request);
+            String signInPage = host != null && host.isUniversity() ? "/staff/sign-in" : "/sign-in";
+            return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create(signInPage + "?error=expired")).build();
+        }
+        return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create(target)).build();
     }
 
     @GetMapping("/api/v1/dev/totp")
