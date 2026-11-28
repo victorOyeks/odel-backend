@@ -56,7 +56,8 @@ public class SecurityConfig {
                     .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                     .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                     .requestMatchers("/internal/**").permitAll() // InternalKeyFilter checks the key
-                    .requestMatchers("/api/v1/public/**", "/api/v1/auth/google/**", "/api/v1/auth/handoff",
+                    .requestMatchers("/api/v1/public/**", "/api/v1/auth/google/**", "/api/v1/auth/microsoft/**",
+                            "/api/v1/auth/email-code/**", "/api/v1/auth/handoff",
                             "/api/v1/auth/dev/**", "/api/v1/dev/**").permitAll()
                     // Students: activation, sign-in and password reset by matric number and emailed code (B1).
                     .requestMatchers("/api/v1/auth/student/**").permitAll()

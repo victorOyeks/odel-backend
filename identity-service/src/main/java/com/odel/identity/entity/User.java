@@ -19,6 +19,10 @@ import java.util.UUID;
 @Getter
 @Setter
 public class User {
+    /**
+     * GOOGLE = a staff account (the name is historical: staff now prove who they are with Google, Microsoft or an emailed
+     * code, as their university chose; the account is tied to the email, not the method). PASSWORD = a student account.
+     */
     public enum AuthType { GOOGLE, PASSWORD }
     public enum Status { INVITED, ACTIVE, SUSPENDED }
 
@@ -55,6 +59,11 @@ public class User {
     private Instant consentAt;
     private int failedSignIns;
     private Instant lockedUntil;
+
+    /** A staff (or provider) account: signs in through the staff sign-in, never with a password. */
+    public boolean isStaff() {
+        return authType == AuthType.GOOGLE;
+    }
 
     public boolean isStudent() {
         return matricNumber != null && authType == AuthType.PASSWORD;

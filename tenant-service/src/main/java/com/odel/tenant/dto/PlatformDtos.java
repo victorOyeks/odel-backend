@@ -24,6 +24,8 @@ public final class PlatformDtos {
 
     public record TenantDetail(UUID id, String name, String shortName, String slug, String webAddress, String portalUrl,
                                String platformUrl, CustomDomain customDomain,
+                               String staffEmailDomain, String staffSignIn, String staffSignInLabel,
+                               /** Old name of staffEmailDomain, kept for older console builds. */
                                String googleDomain, String status, Instant createdAt, Map<String, String> createdBy,
                                BrandingView branding, AdminView firstAdmin, List<NextStep> nextSteps) {}
 
@@ -36,13 +38,27 @@ public final class PlatformDtos {
 
     public record FirstAdmin(String fullName, String email) {}
 
-    public record NewUniversity(String name, String shortName, String slug, String webAddress, String googleDomain,
-                                Branding branding, FirstAdmin firstAdmin) {}
+    /**
+     * staffEmailDomain (googleDomain is its old name and still accepted); staffSignIn GOOGLE (default) | MICROSOFT | EMAIL_CODE.
+     */
+    public record NewUniversity(String name, String shortName, String slug, String webAddress, String staffEmailDomain,
+                                String googleDomain, String staffSignIn, Branding branding, FirstAdmin firstAdmin) {
+        /** The domain under whichever name the client sent. */
+        public String domain() {
+            return staffEmailDomain != null && !staffEmailDomain.isBlank() ? staffEmailDomain : googleDomain;
+        }
+
+        /** The field name to report domain errors under: the one the client used. */
+        public String domainField() {
+            return staffEmailDomain == null && googleDomain != null ? "googleDomain" : "staffEmailDomain";
+        }
+    }
 
     public record Availability(boolean available, String message) {}
 
     /** webAddress: a new own domain (checked again from scratch), or "" to remove it. */
-    public record Changes(String name, String shortName, String webAddress, Branding branding) {}
+    /** staffSignIn: GOOGLE | MICROSOFT | EMAIL_CODE; staff keep their accounts (tied to their email). */
+    public record Changes(String name, String shortName, String webAddress, Branding branding, String staffSignIn) {}
 
     /** The first admin as identity-service reports it. */
     public record Admin(UUID id, String fullName, String email, Instant invitedAt, boolean accepted, Instant acceptedAt) {}

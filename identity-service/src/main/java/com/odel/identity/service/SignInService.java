@@ -8,7 +8,9 @@ import com.odel.identity.dto.SessionView;
 
 import com.odel.identity.entity.User;
 
-import com.odel.identity.dto.GoogleIdentity;
+import com.odel.identity.dto.SignInIdentity;
+import com.odel.identity.client.MicrosoftClient;
+import com.odel.common.security.StaffSignIn;
 
 import com.odel.identity.client.GoogleClient;
 import com.odel.identity.repository.UserRepository;
@@ -49,9 +51,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Staff sign-in (D1 flow C): Google proves who the person is, then two-step code, then the role.
- * Google calls back to one central URL; we then hand the browser back to its university's host with a
- * one-time code, so each university keeps its own first-party session cookie.
+ * Staff sign-in (D1 flow C): the first step proves who the person is (Google, Microsoft or an emailed code, as the
+ * university chose), then the authenticator two-step, then the role. Google and Microsoft call back to one central URL
+ * each; we then hand the browser back to its university's host with a one-time code, so each university keeps its own
+ * first-party session cookie. The emailed code ({@link StaffEmailCodeService}) runs on the university's host and opens
+ * the session through {@link #openStaffSession}.
  */
 @Service
 public class SignInService {
@@ -70,13 +74,14 @@ public class SignInService {
     private final SessionCookies cookies;
     private final AuditService audit;
     private final GoogleClient google;
+    private final MicrosoftClient microsoft;
     private final TransactionTemplate tx;
     private final Clock clock;
 
     public SignInService(StringRedisTemplate redis, ObjectMapper json, OdelProperties props, TenantInfoClient tenants,
                          UserRepository users, RoleAssignmentRepository roles, TrustedDeviceRepository trusted,
                          SessionStore sessions, SessionCookies cookies, AuditService audit, GoogleClient google,
-                         TransactionTemplate tx, Clock clock) {
+                         MicrosoftClient microsoft, TransactionTemplate tx, Clock clock) {
         this.redis = redis;
         this.json = json;
         this.props = props;
@@ -88,51 +93,64 @@ public class SignInService {
         this.cookies = cookies;
         this.audit = audit;
         this.google = google;
+        this.microsoft = microsoft;
         this.tx = tx;
         this.clock = clock;
     }
 
-    public record OAuthState(UUID tenantId, String host, String returnTo, String nonce) {}
+    /** provider: GOOGLE or MICROSOFT (null in states written before Microsoft existed = GOOGLE). */
+    public record OAuthState(UUID tenantId, String host, String returnTo, String nonce, String provider) {
+        public StaffSignIn method() { return StaffSignIn.orGoogle(provider); }
+    }
 
-    record Handoff(UUID tenantId, UUID userId, String returnTo) {}
+    record Handoff(UUID tenantId, UUID userId, String returnTo, String provider) {}
 
     // ---- 1. start ----
 
-    public String start(ResolvedHost host, String returnTo) {
+    /**
+     * Where the browser goes next: the provider's sign-in page (or the dev stand-in), or back to the sign-in page with an
+     * error when this university does not use that method.
+     */
+    public String start(ResolvedHost host, String returnTo, StaffSignIn provider) {
+        TenantInfo tenant = tenants.fresh(host.tenantId());
+        String signIn = tenant.isPlatform() ? "/sign-in" : "/staff/sign-in";
+        if (provider == StaffSignIn.EMAIL_CODE || tenant.method() != provider) return signIn + "?error=wrong_method";
+        if (provider == StaffSignIn.MICROSOFT && !props.google().devStub() && !microsoft.configured()) {
+            return signIn + "?error=method_unavailable";
+        }
         String state = Tokens.random(24);
         String nonce = Tokens.random(16);
-        TenantInfo tenant = tenants.get(host.tenantId());
         String safeReturn = safeReturnTo(returnTo, tenant);
-        put(STATE + state, new OAuthState(tenant.id(), host.host(), safeReturn, nonce), Duration.ofMinutes(10));
+        put(STATE + state, new OAuthState(tenant.id(), host.host(), safeReturn, nonce, provider.name()), Duration.ofMinutes(10));
         if (props.google().devStub()) {
-            return "/api/v1/auth/dev/google?state=" + state;
+            return "/api/v1/auth/dev/" + (provider == StaffSignIn.MICROSOFT ? "microsoft" : "google") + "?state=" + state;
         }
-        String hd = tenant.isPlatform() ? null : tenant.googleDomain();
-        return google.authorizationUrl(state, nonce, hd);
+        String domain = tenant.isPlatform() ? null : tenant.staffEmailDomain();
+        return provider == StaffSignIn.MICROSOFT ? microsoft.authorizationUrl(state, nonce, domain) : google.authorizationUrl(state, nonce, domain);
     }
 
-    // ---- 2. Google's answer (central callback) ----
+    // ---- 2. the provider's answer (central callback) ----
 
-    public String callback(String state, String code, String error) {
+    public String callback(StaffSignIn provider, String state, String code, String error) {
         Optional<OAuthState> s = take(STATE + state, OAuthState.class);
-        if (s.isEmpty()) return null; // unknown or expired state: caller shows a plain page
+        if (s.isEmpty() || s.get().method() != provider) return null; // unknown or expired state: caller shows a plain page
         if (error != null || code == null) return errorUrl(s.get(), "cancelled");
-        GoogleIdentity identity;
+        SignInIdentity identity;
         try {
-            identity = google.exchange(code, s.get().nonce());
+            identity = provider == StaffSignIn.MICROSOFT ? microsoft.exchange(code, s.get().nonce()) : google.exchange(code, s.get().nonce());
         } catch (Exception e) {
-            log.warn("Google sign-in failed: {}", e.getMessage());
+            log.warn("{} sign-in failed: {}", provider.firstFactor(), e.getMessage());
             return errorUrl(s.get(), "expired");
         }
-        return afterGoogle(s.get(), identity);
+        return afterIdentity(s.get(), identity);
     }
 
-    /** Dev stub stands in for Google: the email typed is treated as a verified Google account. */
-    public String devCallback(String state, String email) {
+    /** Dev stand-in for Google or Microsoft: the email typed is treated as a verified account of that provider. */
+    public String devCallback(StaffSignIn provider, String state, String email) {
         Optional<OAuthState> s = take(STATE + state, OAuthState.class);
         if (s.isEmpty()) return null;
-        String domain = email.contains("@") ? email.substring(email.indexOf('@') + 1) : null;
-        return afterGoogle(s.get(), new GoogleIdentity(email.trim(), true, domain, null));
+        if (s.get().method() != provider) return errorUrl(s.get(), "expired");
+        return afterIdentity(s.get(), new SignInIdentity(email == null ? null : email.trim(), true, null));
     }
 
     public Optional<OAuthState> peekState(String state) {
@@ -141,34 +159,49 @@ public class SignInService {
         try { return Optional.of(json.readValue(raw, OAuthState.class)); } catch (Exception e) { return Optional.empty(); }
     }
 
-    private String afterGoogle(OAuthState s, GoogleIdentity identity) {
+    private String afterIdentity(OAuthState s, SignInIdentity identity) {
         return TenantContext.runAs(s.tenantId(), () -> tx.execute(status -> {
-            TenantInfo tenant = tenants.get(s.tenantId());
+            TenantInfo tenant = tenants.fresh(s.tenantId());
             String email = identity.email() == null ? "" : identity.email().toLowerCase();
             if (!tenant.isPlatform() && "SUSPENDED".equals(tenant.status())) {
                 return fail(s, tenant, email, "university_suspended");
             }
+            // The provider changed the university's method while this person was on Google's or Microsoft's page.
+            if (tenant.method() != s.method()) return fail(s, tenant, email, "wrong_method");
             if (!identity.emailVerified()) return fail(s, tenant, email, "not_linked");
-            if (!tenant.isPlatform() && tenant.googleDomain() != null
-                    && !identity.emailDomain().equalsIgnoreCase(tenant.googleDomain())) {
+            if (!tenant.isPlatform() && !StaffEmailRules.onDomain(email, tenant.staffEmailDomain())) {
                 return fail(s, tenant, email, "wrong_domain");
             }
             Optional<User> user = users.findByEmail(email);
-            if (user.isEmpty()) return fail(s, tenant, email, "not_linked");
-            // Students sign in with matric number and password, never with Google (B1).
-            if (user.get().getAuthType() != User.AuthType.GOOGLE) return fail(s, tenant, email, "not_linked");
-            if (user.get().getStatus() == User.Status.SUSPENDED) return fail(s, tenant, email, "suspended");
-            if (roles.findByUserIdOrderByCreatedAt(user.get().getId()).isEmpty()) return fail(s, tenant, email, "no_role");
+            Optional<String> refused = refusal(user);
+            if (refused.isPresent()) return fail(s, tenant, email, refused.get());
             String handoff = Tokens.random(24);
-            put(HANDOFF + handoff, new Handoff(s.tenantId(), user.get().getId(), s.returnTo()), Duration.ofSeconds(60));
+            put(HANDOFF + handoff, new Handoff(s.tenantId(), user.get().getId(), s.returnTo(), s.provider()), Duration.ofSeconds(60));
             return props.webScheme() + "://" + s.host() + "/api/v1/auth/handoff?code=" + handoff;
         }));
     }
 
+    /**
+     * Why a staff account may not sign in (not_linked, suspended, no_role), or empty when it may. The same rules for every
+     * method. Students sign in with matric number and password, never here.
+     */
+    public Optional<String> refusal(Optional<User> user) {
+        if (user.isEmpty() || !user.get().isStaff()) return Optional.of("not_linked");
+        if (user.get().getStatus() == User.Status.SUSPENDED) return Optional.of("suspended");
+        if (roles.findByUserIdOrderByCreatedAt(user.get().getId()).isEmpty()) return Optional.of("no_role");
+        return Optional.empty();
+    }
+
     private String fail(OAuthState s, TenantInfo tenant, String email, String code) {
-        audit.record(new AuditService.Entry(tenant.id(), new AuditService.Actor(null, null, email, null),
-                "SIGN_IN_FAILED", "user", null, "Sign-in refused for " + email + " (" + code + ")", null, Map.of("reason", code)));
+        refused(tenant.id(), email, code, s.method());
         return errorUrl(s, code);
+    }
+
+    /** Audit line for a refused staff sign-in (the address as typed or as the provider gave it). */
+    public void refused(UUID tenantId, String email, String code, StaffSignIn method) {
+        audit.record(new AuditService.Entry(tenantId, new AuditService.Actor(null, null, email, null),
+                "SIGN_IN_FAILED", "user", null, "Sign-in refused for " + email + " (" + code + ", " + method.label() + ")", null,
+                Map.of("reason", code, "method", method.name())));
     }
 
     private String errorUrl(OAuthState s, String code) {
@@ -189,23 +222,39 @@ public class SignInService {
         return tx.execute(status -> {
             User user = users.findInTenant(h.get().userId()).orElse(null);
             if (user == null) return signIn + "?error=not_linked";
-            SessionData data = new SessionData();
-            data.userId = user.getId();
-            data.tenantId = host.tenantId();
-            data.ip = RequestInfo.ip();
-            data.userAgent = RequestInfo.userAgent();
-            if (!user.mfaEnabled()) {
-                data.stage = SessionData.Stage.MFA_SETUP;
-            } else if (trustedDevice(request, user)) {
-                chooseRoleStage(user, data);
-                signedIn(user, data, "Google and a trusted browser");
-            } else {
-                data.stage = SessionData.Stage.MFA_REQUIRED;
-            }
-            cookies.setSession(response, sessions.create(data));
-            String next = h.get().returnTo();
-            return "/auth/continue?next=" + URLEncoder.encode(next, StandardCharsets.UTF_8);
+            return openStaffSession(user, host.tenantId(), h.get().returnTo(), StaffSignIn.orGoogle(h.get().provider()), request, response);
         });
+    }
+
+    /**
+     * The first step passed: opens the half-way session (two-step set-up, two-step code, or straight in on a trusted
+     * browser) and returns where the browser goes next (/auth/continue). Runs inside a transaction.
+     */
+    public String openStaffSession(User user, UUID tenantId, String returnTo, StaffSignIn method,
+                                   HttpServletRequest request, HttpServletResponse response) {
+        SessionData data = new SessionData();
+        data.userId = user.getId();
+        data.tenantId = tenantId;
+        data.ip = RequestInfo.ip();
+        data.userAgent = RequestInfo.userAgent();
+        data.firstFactor = method.firstFactor();
+        if (!user.mfaEnabled()) {
+            data.stage = SessionData.Stage.MFA_SETUP;
+        } else if (trustedDevice(request, user)) {
+            chooseRoleStage(user, data);
+            signedIn(user, data, method.firstFactor() + " and a trusted browser");
+        } else {
+            data.stage = SessionData.Stage.MFA_REQUIRED;
+        }
+        cookies.setSession(response, sessions.create(data));
+        return "/auth/continue?next=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8);
+    }
+
+    /** "/staff" or a path on the same host. */
+    public String safeReturnTo(String returnTo, TenantInfo tenant) {
+        String fallback = tenant.isPlatform() ? "/" : "/staff";
+        if (returnTo == null || !returnTo.startsWith("/") || returnTo.startsWith("//") || returnTo.contains("\\")) return fallback;
+        return returnTo;
     }
 
     private boolean trustedDevice(HttpServletRequest request, User user) {
@@ -276,11 +325,6 @@ public class SignInService {
 
     // ---- helpers ----
 
-    private String safeReturnTo(String returnTo, TenantInfo tenant) {
-        String fallback = tenant.isPlatform() ? "/" : "/staff";
-        if (returnTo == null || !returnTo.startsWith("/") || returnTo.startsWith("//") || returnTo.contains("\\")) return fallback;
-        return returnTo;
-    }
 
     private void put(String key, Object value, Duration ttl) {
         try {

@@ -18,5 +18,15 @@ public final class StaffDtos {
     public record Scope(String scopeType, UUID id, String label) {}
 
     /** From tenant-service. */
-    public record TenantLook(UUID id, String name, String shortName, String googleDomain, String primaryColor, String portalUrl) {}
+    /** staffSignInHow: "Sign in with your Microsoft work account (your @wesleyuni.edu.ng address)". */
+    public record TenantLook(UUID id, String name, String shortName, String staffEmailDomain, String staffSignIn, String staffSignInHow,
+                             String primaryColor, String portalUrl) {
+        public com.odel.common.security.StaffSignIn method() {
+            return com.odel.common.security.StaffSignIn.orGoogle(staffSignIn);
+        }
+
+        public String signInHow() {
+            return staffSignInHow != null ? staffSignInHow : method().how(staffEmailDomain);
+        }
+    }
 }

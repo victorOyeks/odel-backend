@@ -119,7 +119,7 @@ public class MfaService {
         signIn.chooseRoleStage(user, data);
         audit.record(new AuditService.Entry(data.tenantId, signIn.actor(user, data), "MFA_SET_UP", "user", user.getId(),
                 user.getFullName() + " set up two-step sign-in", null, null));
-        signIn.signedIn(user, data, "Google and a new two-step code");
+        signIn.signedIn(user, data, firstFactor(data) + " and a new two-step code");
         sessions.save(cu.sessionKey(), data);
         return new Confirmed(codes, signIn.view(cu.sessionKey(), data));
     }
@@ -129,7 +129,7 @@ public class MfaService {
         requireStage(cu, SessionData.Stage.MFA_REQUIRED);
         User user = users.findById(cu.userId()).orElseThrow();
         if (!checkTotp(user, box.decrypt(user.getMfaSecretEnc()), code)) throw wrong(cu, user);
-        return pass(cu, user, trustDevice, response, "Google and a two-step code", null);
+        return pass(cu, user, trustDevice, response, firstFactor(cu.data()) + " and a two-step code", null);
     }
 
     @Transactional(noRollbackFor = ApiException.class)
@@ -144,7 +144,7 @@ public class MfaService {
         match.setUsedAt(clock.instant());
         audit.record(new AuditService.Entry(cu.tenantId(), signIn.actor(user, cu.data()), "MFA_BACKUP_CODE_USED", "user",
                 user.getId(), user.getFullName() + " used a backup code (" + (unused.size() - 1) + " left)", null, null));
-        return pass(cu, user, trustDevice, response, "Google and a backup code", unused.size() - 1);
+        return pass(cu, user, trustDevice, response, firstFactor(cu.data()) + " and a backup code", unused.size() - 1);
     }
 
     private Verified pass(CurrentUser cu, User user, boolean trustDevice, HttpServletResponse response, String method, Integer left) {
@@ -184,7 +184,7 @@ public class MfaService {
             audit.record(new AuditService.Entry(data.tenantId, signIn.actor(user, data), "MFA_FAILED", "user", user.getId(),
                     "Three wrong two-step codes for " + user.getFullName() + "; sign-in ended", null, Map.of("attempts", MAX_ATTEMPTS)));
             return new ApiException(HttpStatus.UNAUTHORIZED, "too_many_attempts",
-                    "Three wrong codes. For your security, sign in again with Google.");
+                    "Three wrong codes. For your security, start signing in again.");
         }
         sessions.save(cu.sessionKey(), data);
         return new ApiException(HttpStatus.BAD_REQUEST, "wrong_code", "That code is not right. Check the app and try again.",
@@ -204,6 +204,11 @@ public class MfaService {
             out.add(digits.substring(0, 4) + "-" + digits.substring(4));
         }
         return out;
+    }
+
+    /** "Google", "Microsoft" or "an emailed code" (sessions opened before 28 Nov 2026 were all Google). */
+    private static String firstFactor(SessionData data) {
+        return data.firstFactor == null ? "Google" : data.firstFactor;
     }
 
     private static void requireStage(CurrentUser cu, SessionData.Stage stage) {

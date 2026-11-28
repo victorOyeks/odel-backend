@@ -6,7 +6,7 @@ project, one Spring Boot service per module, one Postgres database (a schema per
 | Module | Port | Owns |
 |---|---|---|
 | `api-gateway` | 9300 | The only way in. Routes `/api/v1/**`, works out the university from the browser's host, one Swagger page for all services |
-| `identity-service` | 9301 | Staff, student and provider accounts, roles, Google sign-in, two-step codes, sessions, student activation, password sign-in and reset, People & roles, the university's audit log |
+| `identity-service` | 9301 | Staff, student and provider accounts, roles, staff sign-in (Google, Microsoft 365 or emailed code), two-step codes, sessions, student activation, password sign-in and reset, People & roles, the university's audit log |
 | `tenant-service` | 9302 | Universities (tenants), branding, provider console |
 | `notification-service` | 9303 | Email (Brevo), in-app bell, browser push, templates, background job queue |
 | `academic-service` | 9304 | Sessions and semesters, faculties → departments → programmes, course catalogue, study centres and rooms, staffing, versioned grading rules, structure and catalogue CSV imports, the setup checklist (schema `academic`) |
@@ -61,7 +61,7 @@ scripts/dev/stop-all.sh
 ```
 
 Gateway: http://localhost:9300. Swagger for every service: http://localhost:9300/swagger-ui.html.
-The `dev` profile: a typed-email stand-in for Google sign-in, emails logged (`GET /api/v1/dev/emails`), files on
+The `dev` profile: a typed-email stand-in for Google and Microsoft sign-in, emails logged (`GET /api/v1/dev/emails`), files on
 local disk with signed links, and the provider admin `chuka.obi@odel.dev` created on first start.
 `GET /api/v1/dev/totp?secret=…` gives the current two-step code.
 

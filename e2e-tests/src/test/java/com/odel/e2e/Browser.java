@@ -100,9 +100,19 @@ public class Browser {
 
     /** Google sign-in through the dev stub. Returns the final redirect (to /auth/continue or the error page). */
     public String googleSignIn(String email) {
-        Res start = get("/api/v1/auth/google/start?returnTo=/staff");
+        return providerSignIn("google", email);
+    }
+
+    /** Microsoft sign-in through the dev stand-in (same as Google's). */
+    public String microsoftSignIn(String email) {
+        return providerSignIn("microsoft", email);
+    }
+
+    private String providerSignIn(String provider, String email) {
+        Res start = get("/api/v1/auth/" + provider + "/start?returnTo=/staff");
+        if (!start.location().contains("state=")) return start.location(); // refused before leaving the portal (wrong_method)
         String state = start.location().substring(start.location().indexOf("state=") + 6);
-        Res picked = form("/api/v1/auth/dev/google", Map.of("state", state, "email", email));
+        Res picked = form("/api/v1/auth/dev/" + provider, Map.of("state", state, "email", email));
         if (!picked.location().contains("/api/v1/auth/handoff")) return picked.location();
         return follow(picked.location()).location();
     }

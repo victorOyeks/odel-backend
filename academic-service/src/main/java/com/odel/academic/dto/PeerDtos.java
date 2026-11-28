@@ -35,5 +35,7 @@ public final class PeerDtos {
         public Welcome welcomeOrZero() { return welcome == null ? new Welcome(0, 0, 0) : welcome; }
     }
 
-    public record Tenant(UUID id, String name, String shortName, String googleDomain, String primaryColor, String portalUrl) {}
+    /** staffSignInHow: "Sign in with your Microsoft work account (your @wesleyuni.edu.ng address)", for staff emails. */
+    public record Tenant(UUID id, String name, String shortName, String googleDomain, String primaryColor, String portalUrl,
+                         String staffSignInHow) {}
 }

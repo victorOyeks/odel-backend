@@ -15,4 +15,5 @@
     <include file="db/changelog/006-payment-templates.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/007-content-templates.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/008-profile-templates.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/009-staff-sign-in-templates.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

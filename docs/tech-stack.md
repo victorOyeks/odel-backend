@@ -12,6 +12,8 @@ Same architecture as hospio-backend and coryd-backend: one Maven project with a 
 | Spring Web (MVC) | REST endpoints under `/api/v1` | Plain, well known, enough for 2,000 concurrent users on one server |
 | Spring Security | Sign-in, CSRF protection, role checks | Covers every permission need in one place |
 | Google sign-in (OpenID Connect, verified with Spring's JOSE library) | Staff and provider sign-in with university Google accounts | Staff need no new password (US-08) |
+| Microsoft 365 sign-in (OpenID Connect against Microsoft Entra's multi-tenant `organizations` endpoint, ID tokens verified with the same JOSE library; issuer checked exactly per organisation) | Staff sign-in for universities on Microsoft 365 (`ODEL_MICROSOFT_CLIENT_ID`, `ODEL_MICROSOFT_CLIENT_SECRET`, `ODEL_MICROSOFT_REDIRECT_URI`) | Universities choose their staff sign-in (28 Nov 2026); one platform app serves them all, no new dependency |
+| Emailed sign-in codes (Redis, the students' code rules) | Staff sign-in for universities on any other email provider (Zoho, own mail server) | Works with every mail system; the authenticator two-step still applies |
 | Two-step codes (TOTP, built in) + 8 backup codes | Second factor for every staff account (W-03 to W-05) | Works with any authenticator app; no SMS cost |
 | PostgreSQL 16 | All records | Reliable relational data for results and the audit trail |
 | Liquibase (plain SQL files) | Database changes | Same tool and layout as CoRyd |

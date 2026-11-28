@@ -14,6 +14,9 @@ import com.odel.common.audit.*;
 import com.odel.common.files.*;
 
 import com.odel.identity.service.SignInService;
+import com.odel.identity.service.StaffEmailCodeService;
+import com.odel.common.security.StaffSignIn;
+import java.util.UUID;
 import com.odel.identity.service.Totp;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -31,8 +34,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Development only (odel.google.dev-stub=true, never in production): stands in for Google's account
- * picker so sign-in can be tested without a Google OAuth client, and reads authenticator codes.
+ * Development only (odel.google.dev-stub=true, never in production): stands in for Google's and Microsoft's account
+ * pickers so sign-in can be tested without their apps, reads authenticator codes and expires emailed sign-in codes.
  */
 @RestController
 @ConditionalOnProperty(name = "odel.google.dev-stub", havingValue = "true")
@@ -42,9 +45,11 @@ public class DevController {
     private final UserRepository users;
     private final RoleAssignmentRepository roles;
     private final org.springframework.transaction.support.TransactionTemplate tx;
+    private final StaffEmailCodeService codes;
 
     public DevController(SignInService signIn, TenantInfoClient tenants, UserRepository users, RoleAssignmentRepository roles,
-                         org.springframework.transaction.support.TransactionTemplate tx) {
+                         org.springframework.transaction.support.TransactionTemplate tx, StaffEmailCodeService codes) {
+        this.codes = codes;
         this.signIn = signIn;
         this.tenants = tenants;
         this.users = users;
@@ -54,12 +59,25 @@ public class DevController {
 
     @GetMapping(value = "/api/v1/auth/dev/google", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> picker(@RequestParam String state, jakarta.servlet.http.HttpServletRequest request) {
+        return picker(StaffSignIn.GOOGLE, state, request);
+    }
+
+    /** The Microsoft stand-in: same page, labelled for Microsoft, for universities whose staff use Microsoft 365. */
+    @GetMapping(value = "/api/v1/auth/dev/microsoft", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> microsoftPicker(@RequestParam String state, jakarta.servlet.http.HttpServletRequest request) {
+        return picker(StaffSignIn.MICROSOFT, state, request);
+    }
+
+    private ResponseEntity<String> picker(StaffSignIn provider, String state, jakarta.servlet.http.HttpServletRequest request) {
         var st = signIn.peekState(state);
-        if (st.isEmpty()) return ResponseEntity.status(HttpStatus.SEE_OTHER).location(startAgain(request)).build();
+        if (st.isEmpty() || st.get().method() != provider) return ResponseEntity.status(HttpStatus.SEE_OTHER).location(startAgain(request)).build();
+        boolean ms = provider == StaffSignIn.MICROSOFT;
+        String who = ms ? "Microsoft" : "Google";
+        String action = "/api/v1/auth/dev/" + (ms ? "microsoft" : "google");
         TenantInfo t = tenants.get(st.get().tenantId());
         record Person(String name, String email, String role) {}
         List<Person> people = TenantContext.runAs(t.id(), () -> tx.execute(x -> users.findAll().stream()
-                .filter(u -> u.getStatus() != User.Status.SUSPENDED && u.getAuthType() == User.AuthType.GOOGLE)
+                .filter(u -> u.getStatus() != User.Status.SUSPENDED && u.isStaff())
                 .sorted(Comparator.comparing(User::getFullName))
                 .limit(12)
                 .map(u -> new Person(u.getFullName(), u.getEmail(), roles.findByUserIdOrderByCreatedAt(u.getId()).stream()
@@ -80,7 +98,7 @@ public class DevController {
                       <span class="role">%s</span>
                     </button>""".formatted(esc(p.email()), esc(letters), esc(p.name()), esc(p.email()), esc(p.role())));
         }
-        String domainHint = t.googleDomain() == null ? "name@university.edu.ng" : "name@" + t.googleDomain();
+        String domainHint = t.staffEmailDomain() == null ? "name@university.edu.ng" : "name@" + t.staffEmailDomain();
         String html = """
                 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Choose an account · %1$s</title>
@@ -120,27 +138,29 @@ public class DevController {
                 <main class="card">
                   <div class="top"><span class="crest" id="crest">%9$s</span><div><b>%1$s</b><span>%5$s</span></div></div>
                   <div class="body">
-                    <span class="tag">Development sign-in</span>
+                    <span class="tag">%10$s</span>
                     <h1>Choose an account</h1>
-                    <p class="lead">to continue to %1$s. On the dev site this page stands in for Google; you still confirm with your two-step code next.</p>
-                    <form method="post" action="/api/v1/auth/dev/google" onsubmit="if(window.odelSent)return false;window.odelSent=true">
+                    <p class="lead">to continue to %1$s. On the dev site this page stands in for %11$s; you still confirm with your two-step code next.</p>
+                    <form method="post" action="%12$s" onsubmit="if(window.odelSent)return false;window.odelSent=true">
                       <input type="hidden" name="state" value="%6$s">
                       <div class="list">%7$s</div>
                     </form>
                     <div class="or">or use another email</div>
-                    <form method="post" action="/api/v1/auth/dev/google" onsubmit="if(window.odelSent)return false;window.odelSent=true">
+                    <form method="post" action="%12$s" onsubmit="if(window.odelSent)return false;window.odelSent=true">
                       <input type="hidden" name="state" value="%6$s">
-                      <label for="email">Google account email</label>
+                      <label for="email">%13$s</label>
                       <div class="row"><input id="email" name="email" type="email" required autocomplete="email" placeholder="%8$s"><button class="go" type="submit">Continue</button></div>
                     </form>
-                    <div class="note"><span aria-hidden="true">ⓘ</span><span>Real Google sign-in with the university's accounts replaces this page before launch.</span></div>
+                    <div class="note"><span aria-hidden="true">ⓘ</span><span>On the live site, real %11$s sign-in with the university's accounts replaces this page.</span></div>
                   </div>
                 </main>
                 <script>addEventListener("pageshow",function(){window.odelSent=false})</script>
                 </body></html>""".formatted(esc(t.name()), brand, accent, esc(initials), portal, esc(state),
                 rows.isEmpty() ? "<div class=\"empty\">No staff accounts yet.</div>" : rows.toString(), esc(domainHint),
                 // The crest is in the page itself (stable, cached address), so it shows with the page.
-                t.logoUrl() == null ? esc(initials) : "<img src=\"" + esc(t.logoUrl()) + "\" alt=\"\" width=\"40\" height=\"40\" fetchpriority=\"high\" decoding=\"sync\">");
+                t.logoUrl() == null ? esc(initials) : "<img src=\"" + esc(t.logoUrl()) + "\" alt=\"\" width=\"40\" height=\"40\" fetchpriority=\"high\" decoding=\"sync\">",
+                ms ? "Development sign-in · Microsoft stand-in" : "Development sign-in · Google stand-in", who, action,
+                ms ? "Microsoft work account email" : "Google account email");
         return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
     }
 
@@ -150,7 +170,16 @@ public class DevController {
 
     @PostMapping(value = "/api/v1/auth/dev/google", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Void> pick(@RequestParam String state, @RequestParam String email, jakarta.servlet.http.HttpServletRequest request) {
-        String target = signIn.devCallback(state, email);
+        return pick(StaffSignIn.GOOGLE, state, email, request);
+    }
+
+    @PostMapping(value = "/api/v1/auth/dev/microsoft", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ResponseEntity<Void> microsoftPick(@RequestParam String state, @RequestParam String email, jakarta.servlet.http.HttpServletRequest request) {
+        return pick(StaffSignIn.MICROSOFT, state, email, request);
+    }
+
+    private ResponseEntity<Void> pick(StaffSignIn provider, String state, String email, jakarta.servlet.http.HttpServletRequest request) {
+        String target = signIn.devCallback(provider, state, email);
         if (target == null) {
             // The sign-in state was already used (a second click or a resubmitted form) or has expired: send the
             // person back to the sign-in page with "start again" instead of a bare error page (QA ODEL-B0-001).
@@ -163,6 +192,17 @@ public class DevController {
     private static URI startAgain(jakarta.servlet.http.HttpServletRequest request) {
         ResolvedHost host = TenantFilter.resolved(request);
         return URI.create((host != null && host.isUniversity() ? "/staff/sign-in" : "/sign-in") + "?error=expired");
+    }
+
+    /**
+     * Makes the live emailed sign-in code for this address expire now, so tests can reach "That code has expired" without
+     * waiting 15 minutes. Platform admin only (the dev site is public).
+     */
+    @PostMapping("/api/v1/dev/staff-codes/expire")
+    public Map<String, Object> expireStaffCode(CurrentUserArg.Holder cu, @RequestBody Map<String, String> body) {
+        Access.require(cu.user(), Role.SUPER_ADMIN);
+        UUID tenantId = UUID.fromString(body.get("tenantId"));
+        return Map.of("expired", codes.expireForTest(tenantId, body.get("email")));
     }
 
     @GetMapping("/api/v1/dev/totp")

@@ -20,7 +20,8 @@ import java.util.regex.Pattern;
 /** Message templates: the university's own version if it has one, otherwise the platform default. */
 @Component
 public class Templates {
-    private static final Pattern VAR = Pattern.compile("\\{\\{\\s*([a-zA-Z0-9_.]+)\\s*}}");
+    /** {{name}}, or {{name|fallback}} where a sender built before the value existed may leave it out. */
+    private static final Pattern VAR = Pattern.compile("\\{\\{\\s*([a-zA-Z0-9_.]+)\\s*(?:\\|([^{}]*))?}}");
     private final JdbcTemplate jdbc;
 
     public Templates(JdbcTemplate jdbc) {
@@ -39,13 +40,17 @@ public class Templates {
                 key, channel.name(), tenantId, TenantContext.PLATFORM_TENANT_ID, tenantId).stream().findFirst();
     }
 
-    /** Replaces {{name}}; a placeholder with no value is an error, so a message never goes out half-filled. */
+    /**
+     * Replaces {{name}}; a placeholder with no value is an error, so a message never goes out half-filled. {{name|text}}
+     * uses text when the value is missing (used only where an older sender may not pass it yet).
+     */
     public static String render(String text, Map<String, ?> vars) {
         if (text == null) return null;
         Matcher m = VAR.matcher(text);
         StringBuilder sb = new StringBuilder();
         while (m.find()) {
             Object v = vars.get(m.group(1));
+            if (v == null && m.group(2) != null) v = m.group(2).trim();
             if (v == null) throw new IllegalArgumentException("Template value missing: " + m.group(1));
             m.appendReplacement(sb, Matcher.quoteReplacement(String.valueOf(v)));
         }

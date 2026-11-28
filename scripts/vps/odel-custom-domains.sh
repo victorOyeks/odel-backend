@@ -53,7 +53,7 @@ server {
     proxy_set_header X-Forwarded-Proto \$scheme;
     proxy_set_header X-Forwarded-Host \$host;
     proxy_connect_timeout 5s;
-    location ~ ^/api/v1/auth/(google|mfa|dev) {
+    location ~ ^/api/v1/auth/(google|microsoft|email-code|mfa|dev) {
         limit_req zone=odel_dev_auth burst=20 nodelay;
         limit_req_status 429;
         proxy_pass http://odel_dev_web;

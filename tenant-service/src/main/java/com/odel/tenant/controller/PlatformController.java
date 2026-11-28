@@ -54,10 +54,12 @@ public class PlatformController {
     private final CustomDomainService domains;
     private final TransactionTemplate tx;
     private final Clock clock;
+    private final com.odel.common.OdelProperties props;
 
     public PlatformController(TenantRepository tenants, TenantSetupService setup, StorageService storage,
                               PublicContextController branding, JdbcTemplate jdbc, TransactionTemplate tx, Clock clock, InternalClient internal,
-                              @org.springframework.context.annotation.Lazy CustomDomainService domains) {
+                              @org.springframework.context.annotation.Lazy CustomDomainService domains, com.odel.common.OdelProperties props) {
+        this.props = props;
         this.domains = domains;
         this.internal = internal;
         this.tenants = tenants;
@@ -190,12 +192,18 @@ public class PlatformController {
                 default -> new NextStep("Waiting for the university's IT team: a CNAME record for " + t.getWebAddress() + " pointing to " + custom.pointTo(), false);
             });
         }
+        if (PublicContextController.staffSignIn(t) == com.odel.common.security.StaffSignIn.MICROSOFT && !props.google().devStub()
+                && (props.microsoft() == null || props.microsoft().clientId() == null || props.microsoft().clientId().isBlank())) {
+            steps.add(new NextStep("Waiting: Microsoft sign-in is not switched on for the platform yet (the platform's Microsoft app"
+                    + " is not registered), so staff cannot sign in until it is", false));
+        }
         steps.add(admin == null ? new NextStep("First admin not invited yet", false)
                 : admin.accepted() ? new NextStep(admin.fullName() + " accepted the invitation and signed in", true)
                 : new NextStep("Invitation emailed to " + admin.fullName() + "; waiting for the first sign-in", false));
         steps.add(new NextStep("Waiting: " + (admin == null ? "the first admin" : admin.fullName()) + " completes the setup checklist", false));
         return new TenantDetail(t.getId(), t.getName(), t.getShortName(), t.getSlug(), t.getWebAddress(), setup.portalUrl(t),
-                platform, custom, t.getGoogleDomain(), t.getStatus().name(), t.getCreatedAt(), createdBy == null ? null : Map.of("fullName", createdBy),
+                platform, custom, t.getStaffEmailDomain(), PublicContextController.staffSignIn(t).name(),
+                PublicContextController.staffSignIn(t).label(), t.getStaffEmailDomain(), t.getStatus().name(), t.getCreatedAt(), createdBy == null ? null : Map.of("fullName", createdBy),
                 new BrandingView(t.getPrimaryColor(), t.getAccentColor(), b.logoUrl(), readable), admin, steps);
     }
 
