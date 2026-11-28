@@ -23,9 +23,10 @@ public class StudentCodeStore {
     private static final String FLOW = "odel:stu:flow:";
     private static final String FLOW_FOR = "odel:stu:flow-for:";
     private static final String TOKEN = "odel:stu:token:";
+    private static final String NEW_EMAIL = "odel:stu:new-email:";
     public static final Duration FLOW_TTL = Duration.ofMinutes(30);
 
-    public enum Purpose { ACTIVATION, RESET }
+    public enum Purpose { ACTIVATION, RESET, EMAIL_CHANGE }
 
     public record Flow(UUID tenantId, UUID userId, Purpose purpose) {}
 
@@ -112,6 +113,20 @@ public class StudentCodeStore {
 
     public void deleteToken(String token) {
         redis.delete(TOKEN + Tokens.sha256(token));
+    }
+
+    // ---- email change (L-14d): the address the code went to, until it is confirmed ----
+
+    public void putNewEmail(UUID userId, String email) {
+        redis.opsForValue().set(NEW_EMAIL + userId, email, FLOW_TTL);
+    }
+
+    public Optional<String> newEmail(UUID userId) {
+        return Optional.ofNullable(redis.opsForValue().get(NEW_EMAIL + userId));
+    }
+
+    public void deleteNewEmail(UUID userId) {
+        redis.delete(NEW_EMAIL + userId);
     }
 
     private void write(String key, Object value, Duration ttl) {

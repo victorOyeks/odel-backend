@@ -31,8 +31,11 @@ public class StudentAccountsInternalController {
     private final SessionStore sessions;
     private final StudentAuthService auth;
     private final Clock clock;
+    private final com.odel.identity.service.StudentAccountService accounts;
 
-    public StudentAccountsInternalController(JdbcTemplate jdbc, UserRepository users, StudentUserRepository byId, SessionStore sessions, StudentAuthService auth, Clock clock) {
+    public StudentAccountsInternalController(JdbcTemplate jdbc, UserRepository users, StudentUserRepository byId, SessionStore sessions, StudentAuthService auth, Clock clock,
+                                             com.odel.identity.service.StudentAccountService accounts) {
+        this.accounts = accounts;
         this.jdbc = jdbc;
         this.users = users;
         this.byId = byId;
@@ -168,6 +171,13 @@ public class StudentAccountsInternalController {
     @PostMapping("/accounts/{userId}/password-reset")
     public ResponseEntity<Void> passwordReset(@PathVariable UUID userId) {
         auth.officeReset(userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** B3: student-service asks before saving a new phone number (L-14b "Your password · to confirm it is you"). */
+    @PostMapping("/accounts/{userId}/check-password")
+    public ResponseEntity<Void> checkPassword(@PathVariable UUID userId, @RequestBody java.util.Map<String, String> body) {
+        accounts.checkPassword(userId, body == null ? null : body.get("password"), "password");
         return ResponseEntity.noContent().build();
     }
 
