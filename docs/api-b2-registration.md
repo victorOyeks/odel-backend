@@ -347,3 +347,12 @@ Email and bell (`IN_APP`) for each; variables in `{{…}}`:
 `REGISTRATION_LATE_APPROVED`, `REGISTRATION_LATE_DECLINED`, `REGISTRATION_CHANGE_APPROVED`, `REGISTRATION_CHANGE_DECLINED`,
 `REGISTRATION_RULES_UPDATED`, `CARRY_OVER_ADDED`, `CARRY_OVER_REMOVED`, `CARRY_OVERS_IMPORTED`; student-service `STUDENT_CENTRE_CHANGED`
 (now with reason and effective date), `STUDENT_CENTRE_MOVE_SCHEDULED`, `STUDENT_CENTRE_MOVE_CANCELLED`.
+
+## Changes to B1
+- academic-service: editing a session (`PUT /academic/sessions/{id}`) now keeps its semesters' ids (they were deleted and
+  re-created on every save, which would orphan registrations and fees keyed by semester). A semester left out of the request is removed.
+- academic-service: new internal endpoints above (`/internal/academic/calendar`, `/semesters/{id}`, `/offerings`, `/courses`, `/coordinators`).
+- student-service: `PATCH /students/{id}` with another `centreCode` needs `centreChangeReason` (section 8); `GET /students/{id}` adds `centreMoves`;
+  changelog `002-centre-moves.sql`; new internal endpoints above.
+- common: `InternalClient.getAt/postAt` call a service by a base URL from the caller's own settings (registration → payment-service,
+  student → registration-service), so `OdelProperties.Services` did not need new entries.

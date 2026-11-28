@@ -145,9 +145,14 @@ public class SessionService {
         s.setName(in.name().trim());
         s.setUpdatedAt(clock.instant());
         apply(s, in);
-        semesters.deleteBySessionId(s.getId());
+        // Semesters keep their ids (registrations and fees refer to them); one left out of the request is removed.
+        java.util.Map<Integer, Semester> existing = new java.util.HashMap<>();
+        semesters.findBySessionIdOrderByNumber(s.getId()).forEach(x -> existing.put(x.getNumber(), x));
+        java.util.Set<Integer> sent = new java.util.HashSet<>();
+        if (in.semesters() != null) in.semesters().forEach(x -> sent.add(x.number()));
+        existing.values().stream().filter(x -> !sent.contains(x.getNumber())).forEach(semesters::delete);
         semesters.flush();
-        writeSemesters(s, in);
+        writeSemesters(s, in, existing);
         if (Boolean.TRUE.equals(in.makeActive()) && s.getStatus() != AcademicSession.Status.ACTIVE) activate(s, actor, false);
         audit.record(new AuditService.Entry(TenantContext.require(), actor, "SESSION_UPDATED", "session", s.getId(),
                 "Changed the " + s.getName() + " session's dates", before.semesters(), null));
@@ -227,10 +232,20 @@ public class SessionService {
     }
 
     private void writeSemesters(AcademicSession s, SessionIn in) {
+        writeSemesters(s, in, java.util.Map.of());
+    }
+
+    private void writeSemesters(AcademicSession s, SessionIn in, java.util.Map<Integer, Semester> existing) {
         if (in.semesters() == null) return;
         for (SemesterIn x : in.semesters()) {
-            Semester m = new Semester();
-            m.setId(UUID.randomUUID());
+            Semester m = existing.get(x.number());
+            if (m == null) {
+                m = new Semester();
+                m.setId(UUID.randomUUID());
+            }
+            m.setRegOpensOn(null);
+            m.setRegClosesOn(null);
+            m.setLateRegClosesOn(null);
             m.setSessionId(s.getId());
             m.setNumber(x.number());
             m.setStartsOn(x.startsOn());
