@@ -39,13 +39,13 @@ public class EmailJob implements JobHandler {
 
     @Override public String type() { return TYPE; }
 
-    record Row(String to, String fromName, String subject, String body, String html, String status) {}
+    record Row(String to, String fromName, String subject, String body, String html, String status, String attachments) {}
 
     @Override
     public void handle(JsonNode payload) throws Exception {
         UUID id = UUID.fromString(payload.get("id").asText());
-        Row row = jdbc.queryForObject("select to_address, from_name, subject, body, html_body, status from outbound_messages where id = ? and tenant_id = ?",
-                (rs, i) -> new Row(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6)),
+        Row row = jdbc.queryForObject("select to_address, from_name, subject, body, html_body, status, attachments::text from outbound_messages where id = ? and tenant_id = ?",
+                (rs, i) -> new Row(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7)),
                 id, TenantContext.require());
         if (row == null || "SENT".equals(row.status()) || "SKIPPED".equals(row.status())) return; // safe to run twice
         if (TestAddresses.isTest(row.to())) {
@@ -60,7 +60,7 @@ public class EmailJob implements JobHandler {
         }
         String fromName = row.fromName();
         try {
-            sender.send(row.to(), fromName, row.subject(), row.body(), row.html());
+            sender.send(row.to(), fromName, row.subject(), row.body(), row.html(), EmailSender.Attachment.fromJson(row.attachments()));
             jdbc.update("update outbound_messages set status = 'SENT', sent_at = ?, attempts = attempts + 1 where id = ?",
                     Timestamp.from(clock.instant()), id);
         } catch (Exception e) {

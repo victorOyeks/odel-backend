@@ -67,10 +67,10 @@ public class MessageService {
             String body = Templates.render(email.get().body(), vars);
             emailId = UUID.randomUUID();
             jdbc.update("""
-                    insert into outbound_messages (id, tenant_id, user_id, channel, template_key, to_address, from_name, subject, body, html_body, status, created_at)
-                    values (?, ?, ?, 'EMAIL', ?, ?, ?, ?, ?, ?, 'QUEUED', ?)""",
+                    insert into outbound_messages (id, tenant_id, user_id, channel, template_key, to_address, from_name, subject, body, html_body, status, created_at, attachments)
+                    values (?, ?, ?, 'EMAIL', ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?::jsonb)""",
                     emailId, tenantId, m.userId(), m.templateKey(), m.email(), tenant.shortName(), subject, body, html(tenant, subject, body),
-                    Timestamp.from(clock.instant()));
+                    Timestamp.from(clock.instant()), attachmentsJson(m));
             jobs.enqueue(EmailJob.TYPE, Map.of("id", emailId.toString()));
         }
 
@@ -100,6 +100,23 @@ public class MessageService {
         }
         return emailId;
     }
+
+    private String attachmentsJson(Message m) {
+        if (m.attachments() == null || m.attachments().isEmpty()) return null;
+        long total = 0;
+        for (var a : m.attachments()) {
+            if (a.fileName() == null || a.base64() == null) throw com.odel.common.ApiException.badRequest("bad_attachment", "An attachment needs a file name and content.");
+            total += a.base64().length();
+        }
+        if (total > 2_800_000) throw com.odel.common.ApiException.badRequest("attachment_too_large", "Attachments may be at most 2 MB in all.");
+        try {
+            return JSON.writeValueAsString(m.attachments());
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
     /** Many messages in one transaction (welcome emails to a whole intake). Returns each email's id, in order. */
     @Transactional

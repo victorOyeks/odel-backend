@@ -53,4 +53,11 @@ public class TenantInternalController {
         // portalUrl: where emails should send people (the university's own domain once live, else its platform address).
         return tenants.findById(id).map(t -> TenantView.of(t, t.isPlatform() ? null : setup.portalUrl(t))).orElseThrow(ApiException::notFound);
     }
+
+    /** Every university, newest first (payment-service's provider list, B2). */
+    @GetMapping("/tenants")
+    public java.util.List<TenantView> universities() {
+        return tenants.findByKindOrderByCreatedAtDesc(com.odel.tenant.entity.Tenant.Kind.UNIVERSITY).stream()
+                .map(t -> TenantView.of(t, setup.portalUrl(t))).toList();
+    }
 }

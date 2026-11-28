@@ -22,8 +22,17 @@ public final class MessageDtos {
     /**
      * @param userId may be null for someone without an account yet (then only email goes)
      * @param link   where the bell item and push open, on the person's portal
+     * @param attachments files for the email only (a receipt PDF); may be null
      */
-    public record Message(UUID userId, String email, String templateKey, Map<String, ?> vars, String link, TenantLook tenant) {}
+    public record Message(UUID userId, String email, String templateKey, Map<String, ?> vars, String link, TenantLook tenant,
+                          List<Attachment> attachments) {
+        public Message(UUID userId, String email, String templateKey, Map<String, ?> vars, String link, TenantLook tenant) {
+            this(userId, email, templateKey, vars, link, tenant, null);
+        }
+    }
+
+    /** A file attached to the email, its bytes in base64 (small files only: at most 2 MB). */
+    public record Attachment(String fileName, String contentType, String base64) {}
 
     /** The university's name and colour, sent by the caller so emails carry its branding. */
     public record TenantLook(String name, String shortName, String primaryColor) {}

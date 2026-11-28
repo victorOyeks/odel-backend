@@ -11,4 +11,5 @@
     <include file="db/changelog/002-skipped-status.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/003-student-templates.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/004-staff-templates.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/006-payment-templates.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>
