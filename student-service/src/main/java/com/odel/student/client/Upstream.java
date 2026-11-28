@@ -21,8 +21,10 @@ final class Upstream {
             b.fields().forEachRemaining(f -> {
                 if (!f.getKey().equals("error") && !f.getKey().equals("message") && !f.getKey().equals("fields")) extra.put(f.getKey(), JSON.convertValue(f.getValue(), Object.class));
             });
+            Map<String, String> fields = new HashMap<>();
+            b.path("fields").fields().forEachRemaining(f -> fields.put(f.getKey(), f.getValue().asText()));
             return new ApiException(e.status(), b.path("error").asText("upstream"), b.path("message").asText("Something went wrong. Try again."),
-                    null, extra.isEmpty() ? null : extra);
+                    fields.isEmpty() ? null : fields, extra.isEmpty() ? null : extra);
         } catch (Exception ignored) {
             return e;
         }

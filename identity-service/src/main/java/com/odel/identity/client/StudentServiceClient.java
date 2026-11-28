@@ -37,4 +37,12 @@ public class StudentServiceClient {
         internal.post(InternalClient.Service.STUDENTS, "/internal/students/activated",
                 Map.of("userId", userId, "activatedAt", at, "consentVersion", consentVersion, "consentAt", consentAt), Void.class);
     }
+
+    /** B3: the student confirmed a new email (L-14e). Part of the change: if student-service cannot be told, the change is rolled back. */
+    public void emailChanged(UUID userId, String email, String oldEmail) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("email", email);
+        body.put("oldEmail", oldEmail);
+        internal.post(InternalClient.Service.STUDENTS, "/internal/students/by-user/" + userId + "/email", body, Void.class);
+    }
 }

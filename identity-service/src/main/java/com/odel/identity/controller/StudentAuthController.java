@@ -105,6 +105,12 @@ public class StudentAuthController {
         return auth.completeReset(body.resetToken(), body.password(), body.confirmPassword(), Boolean.TRUE.equals(body.keepSignedIn()), response);
     }
 
+    /** B3: "Use a recovery code" when she cannot open her email; then /password-reset/complete with the token. */
+    @PostMapping("/password-reset/recovery")
+    public Map<String, Object> resetByRecoveryCode(@RequestBody com.odel.identity.dto.StudentSecurityDtos.RecoveryResetRequest body) {
+        return auth.recoveryReset(body.login(), body.recoveryCode());
+    }
+
     private static Map<String, Object> view(String idName, CodeSent s) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put(idName, s.flowId());

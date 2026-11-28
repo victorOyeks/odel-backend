@@ -13,9 +13,11 @@ import java.util.UUID;
 @RequestMapping("/internal/students")
 public class StudentInternalController {
     private final StudentService students;
+    private final com.odel.student.service.ProfileService profiles;
 
-    public StudentInternalController(StudentService students) {
+    public StudentInternalController(StudentService students, com.odel.student.service.ProfileService profiles) {
         this.students = students;
+        this.profiles = profiles;
     }
 
     /** academic-service, for the setup checklist (steps 8 Import and 9 Welcome). */
@@ -43,6 +45,15 @@ public class StudentInternalController {
     public StudentRef byUser(@PathVariable UUID userId) {
         TenantContext.require();
         return students.refByUser(userId);
+    }
+
+    /** identity-service (B3): the student confirmed a new email with the code sent to it (L-14e). */
+    @PostMapping("/by-user/{userId}/email")
+    public org.springframework.http.ResponseEntity<Void> emailChanged(@PathVariable UUID userId,
+                                                                      @RequestBody com.odel.student.dto.ProfileDtos.EmailChanged body) {
+        TenantContext.require();
+        profiles.emailChanged(userId, body);
+        return org.springframework.http.ResponseEntity.noContent().build();
     }
 
     @GetMapping("/by-matric")

@@ -70,10 +70,15 @@ public class StudentAuthService {
     private final TransactionTemplate tx;
     private final OdelProperties props;
     private final Clock clock;
+    private final com.odel.identity.repository.MfaBackupCodeRepository recoveryCodes;
+    private final com.odel.identity.client.StudentMessagesClient messages;
 
     public StudentAuthService(UserRepository users, StudentUserRepository byId, RoleAssignmentRepository roles, StudentCodeStore store, StudentServiceClient students,
                               TenantInfoClient tenants, InternalClient internal, SessionStore sessions, SessionCookies cookies,
-                              SignInService signIn, AuditService audit, TransactionTemplate tx, OdelProperties props, Clock clock) {
+                              SignInService signIn, AuditService audit, TransactionTemplate tx, OdelProperties props, Clock clock,
+                              com.odel.identity.repository.MfaBackupCodeRepository recoveryCodes, com.odel.identity.client.StudentMessagesClient messages) {
+        this.recoveryCodes = recoveryCodes;
+        this.messages = messages;
         this.users = users;
         this.byId = byId;
         this.roles = roles;
@@ -263,6 +268,74 @@ public class StudentAuthService {
         store.deleteToken(token);
         store.endFlow(Purpose.RESET, v.userId());
         return view;
+    }
+
+    // ---------------------------------------------------------------- reset by recovery code (B3, L-14g)
+
+    private record RecoveryOutcome(Verified verified, int codesLeft, User user, ApiException error) {}
+
+    /**
+     * "Use a recovery code" on the forgot-password screen, for a student who cannot open her email. A right code is used up and
+     * gives the same reset token as an emailed code; wrong codes count with wrong passwords (five pause sign-in for 15 minutes).
+     */
+    public Map<String, Object> recoveryReset(String login, String recoveryCode) {
+        TenantInfo tenant = university();
+        RecoveryOutcome out = tx.execute(s -> {
+            User user = findStudent(login).orElse(null);
+            if (user == null) return new RecoveryOutcome(null, 0, null, notFound());
+            if (user.getStatus() == User.Status.SUSPENDED) return new RecoveryOutcome(null, 0, null, suspended(tenant));
+            if (user.getPasswordHash() == null) return new RecoveryOutcome(null, 0, null,
+                    new ApiException(HttpStatus.CONFLICT, "not_activated", "This account is not active yet. Activate it first."));
+            Instant now = clock.instant();
+            LockoutPolicy.State state = LockoutPolicy.current(user.getFailedSignIns(), user.getLockedUntil(), now);
+            if (state.locked(now)) return new RecoveryOutcome(null, 0, null, locked(state, now));
+            java.util.List<com.odel.identity.entity.MfaBackupCode> unused = recoveryCodes.findByUserIdAndUsedAtIsNull(user.getId());
+            if (unused.isEmpty()) {
+                String where = students.contact(user.getId()).map(StudentContact::centre).filter(c -> c != null && c.name() != null)
+                        .map(CentreView::name).orElse("your study centre");
+                return new RecoveryOutcome(null, 0, null, new ApiException(HttpStatus.CONFLICT, "no_recovery_codes",
+                        "You have no recovery codes. Ask the ODeL office at " + where + " to check your admission letter and update your email."));
+            }
+            String digits = recoveryCode == null ? "" : recoveryCode.replaceAll("\\D", "");
+            com.odel.identity.entity.MfaBackupCode match = digits.length() != 8 ? null
+                    : unused.stream().filter(c -> BCRYPT.matches(digits, c.getCodeHash())).findFirst().orElse(null);
+            if (match == null) {
+                LockoutPolicy.State next = LockoutPolicy.afterWrong(state, now);
+                user.setFailedSignIns(next.failed());
+                user.setLockedUntil(next.lockedUntil());
+                users.save(user);
+                audit(tenant.id(), user, null, "STUDENT_RECOVERY_CODE_FAILED", user.getFullName() + " typed a wrong recovery code", Map.of("failed", next.failed()));
+                if (next.locked(now)) return new RecoveryOutcome(null, 0, null, locked(next, now));
+                String tries = next.attemptsLeft() == 1 ? "1 try" : next.attemptsLeft() + " tries";
+                return new RecoveryOutcome(null, 0, null, new ApiException(HttpStatus.UNAUTHORIZED, "wrong_recovery_code",
+                        "That recovery code is not right. " + tries + " left before sign-in pauses for 15 minutes.", null, Map.of("attemptsLeft", next.attemptsLeft())));
+            }
+            match.setUsedAt(now);
+            recoveryCodes.save(match);
+            user.setFailedSignIns(0);
+            user.setLockedUntil(null);
+            users.save(user);
+            int left = unused.size() - 1;
+            audit(tenant.id(), user, null, "STUDENT_RECOVERY_CODE_USED", user.getFullName() + " used a recovery code to reset the password (" + left + " left)",
+                    Map.of("left", left));
+            String token = store.newToken(new StudentCodeStore.Verified(tenant.id(), user.getId(), Purpose.RESET, null));
+            return new RecoveryOutcome(new Verified(token, StudentCodeStore.FLOW_TTL.toSeconds(), brief(user)), left, user, null);
+        });
+        if (out.error() != null) throw out.error();
+        User user = out.user();
+        if (user.getEmail() != null) {
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("firstName", user.firstName());
+            vars.put("codesLeft", out.codesLeft());
+            vars.put("when", ProfileFormat.when(clock.instant()));
+            messages.notice(tenant, user.getId(), user.getEmail(), "student.recovery_code_used", vars, "/profile");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("resetToken", out.verified().token());
+        body.put("expiresInSeconds", out.verified().expiresInSeconds());
+        body.put("student", out.verified().student());
+        body.put("codesLeft", out.codesLeft());
+        return body;
     }
 
     /** W-22b "Send her a reset code by email": a code plus a link to the reset screen. */

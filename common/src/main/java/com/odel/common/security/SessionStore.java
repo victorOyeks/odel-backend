@@ -98,6 +98,42 @@ public class SessionStore {
         redis.delete(USER_INDEX + userId);
     }
 
+    /** Every live session of one person (L-14j "Signed in on"); stale index entries are dropped on the way. */
+    public java.util.List<Found> list(UUID userId) {
+        Set<String> keys = redis.opsForSet().members(USER_INDEX + userId);
+        java.util.List<Found> out = new java.util.ArrayList<>();
+        if (keys == null) return out;
+        for (String k : keys) {
+            String raw = redis.opsForValue().get(KEY + k);
+            if (raw == null) {
+                redis.opsForSet().remove(USER_INDEX + userId, k);
+                continue;
+            }
+            try {
+                SessionData data = json.readValue(raw, SessionData.class);
+                if (data.createdAt != null && data.createdAt.plus(cfg.absoluteTimeout()).isBefore(clock.instant())) {
+                    delete(k, userId);
+                    continue;
+                }
+                out.add(new Found(k, data));
+            } catch (JsonProcessingException e) {
+                delete(k, userId);
+            }
+        }
+        return out;
+    }
+
+    /** "Sign out others": every session of the person but the one given. Returns how many ended. */
+    public int deleteAllForUserExcept(UUID userId, String keepKey) {
+        int n = 0;
+        for (Found f : list(userId)) {
+            if (f.key().equals(keepKey)) continue;
+            delete(f.key(), userId);
+            n++;
+        }
+        return n;
+    }
+
     private void write(String key, SessionData data) {
         try {
             redis.opsForValue().set(KEY + key, json.writeValueAsString(data), ttl(data));

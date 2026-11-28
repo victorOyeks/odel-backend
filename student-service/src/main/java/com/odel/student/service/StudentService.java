@@ -42,11 +42,19 @@ public class StudentService {
     private final Clock clock;
     private final CentreMoveRepository centreMoves;
     private final CentreMoveService moveService;
+    private final ProfileHistory profileHistory;
+    private final com.odel.student.repository.ProfileRequestRepository profileRequests;
+    private final com.odel.common.files.StorageService storage;
 
     public StudentService(StudentRepository students, StudentStatusChangeRepository history, StudentImportRepository imports,
                           StudentBulkRepository bulk, IdentityClient identity, AcademicLookupService academic, WelcomeService welcome,
                           ActorService actors, AuditService audit, TransactionTemplate tx, Clock clock, CentreMoveRepository centreMoves,
-                          @org.springframework.context.annotation.Lazy CentreMoveService moveService) {
+                          @org.springframework.context.annotation.Lazy CentreMoveService moveService,
+                          ProfileHistory profileHistory, com.odel.student.repository.ProfileRequestRepository profileRequests,
+                          com.odel.common.files.StorageService storage) {
+        this.profileHistory = profileHistory;
+        this.profileRequests = profileRequests;
+        this.storage = storage;
         this.centreMoves = centreMoves;
         this.moveService = moveService;
         this.students = students;
@@ -127,7 +135,13 @@ public class StudentService {
                     s.getEntrySession(), s.getStatus().name(), s.getStatus().label(),
                     new Account(s.getWelcomeSentAt(), s.getActivatedAt(), s.getConsentAt() == null ? null : new Consent(s.getConsentVersion(), s.getConsentAt()),
                             a == null ? null : a.lastSignInAt(), a == null ? null : a.lockedUntil()),
-                    h, s.getCreatedAt(), ref, centreMoves.findByStudentIdOrderByCreatedAtDesc(s.getId()).stream().map(CentreMoveService::view).toList());
+                    h, s.getCreatedAt(), ref, centreMoves.findByStudentIdOrderByCreatedAtDesc(s.getId()).stream().map(CentreMoveService::view).toList(),
+                    s.getAddressLine() == null && s.getAddressState() == null ? null
+                            : new com.odel.student.dto.ProfileDtos.Address(s.getAddressLine(), s.getAddressTown(), s.getAddressState()),
+                    s.getNextOfKinName() == null ? null
+                            : new com.odel.student.dto.ProfileDtos.NextOfKin(s.getNextOfKinName(), s.getNextOfKinRelationship(), s.getNextOfKinPhone()),
+                    ProfileService.photo(s, storage),
+                    profileRequests.findByStudentIdAndStatus(s.getId(), com.odel.student.entity.ProfileRequest.Status.PENDING).size());
         });
     }
 
@@ -257,7 +271,12 @@ public class StudentService {
             before.forEach((k, v) -> { if (!Objects.equals(v, after.get(k))) { oldV.put(k, v); newV.put(k, after.get(k)); } });
             audit.record(new AuditService.Entry(s.getTenantId(), actor, "STUDENT_UPDATED", "student", s.getId(),
                     actor.name() + " changed " + s.displayName() + "'s record (" + String.join(", ", newV.keySet()) + ")", oldV, newV));
+            OFFICE_FIELDS.forEach((key, field) -> {
+                if (newV.containsKey(key)) profileHistory.record(s, field, str(oldV.get(key)), str(newV.get(key)),
+                        com.odel.student.entity.ProfileChange.Source.OFFICE, null, cu.userId(), actor.name());
+            });
         });
+        tellStudentOfContactChange(s, before, after);
         if (moving) moveService.record(cu, id, new com.odel.student.dto.CentreMoveDtos.MoveRequest(in.centreCode(), in.centreChangeReason(),
                 in.centreEffectiveOn()), "centreChangeReason");
         return record(id);
@@ -323,32 +342,6 @@ public class StudentService {
     }
 
     // ---------------------------------------------------------------- the student's own record (M-06)
-
-    public Profile profile(CurrentUser cu) {
-        if (cu.activeRole() != Role.STUDENT) throw ApiException.forbidden();
-        return tx.execute(t -> students.findByUserId(cu.userId()).map(this::profile).orElseThrow(ApiException::notFound));
-    }
-
-    public Profile updateProfile(CurrentUser cu, ProfileUpdate in) {
-        if (cu.activeRole() != Role.STUDENT) throw ApiException.forbidden();
-        Student s = tx.execute(t -> students.findByUserId(cu.userId()).orElseThrow(ApiException::notFound));
-        String phone = in.phone() == null || in.phone().isBlank() ? null : ImportValidator.phone(in.phone());
-        if (in.phone() != null && !in.phone().isBlank() && phone == null) {
-            throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "Enter a Nigerian phone number, like 0803 412 4417.",
-                    Map.of("phone", "Enter a Nigerian phone number, like 0803 412 4417."));
-        }
-        tx.executeWithoutResult(t -> {
-            String old = s.getPhone();
-            s.setPhone(phone);
-            s.setUpdatedAt(clock.instant());
-            students.save(s);
-            identity.change(s.getUserId(), new IdentityDtos.ChangeRequest(null, null, null, phone == null ? "" : phone));
-            audit.record(new AuditService.Entry(s.getTenantId(), new AuditService.Actor(cu.userId(), cu.tenantId(), s.displayName(), "STUDENT"),
-                    "STUDENT_UPDATED", "student", s.getId(), s.displayName() + " updated their phone number",
-                    old == null ? null : Map.of("phone", old), phone == null ? null : Map.of("phone", phone)));
-        });
-        return tx.execute(t -> profile(students.findInTenant(s.getId()).orElseThrow()));
-    }
 
     // ---------------------------------------------------------------- internal
 
@@ -434,10 +427,6 @@ public class StudentService {
                 s.getStatus().name(), s.getStatus().label());
     }
 
-    private Profile profile(Student s) {
-        return new Profile(s.getId(), s.getMatricNumber(), s.displayName(), s.getFirstName(), s.initials(), programme(s), s.getLevel(), s.getLevel() + "L",
-                centre(s), s.getEmail(), s.getPhone(), s.getStatus().name(), s.getConsentAt() == null ? null : new Consent(s.getConsentVersion(), s.getConsentAt()));
-    }
 
     private static ProgrammeView programme(Student s) {
         return new ProgrammeView(s.getProgrammeCode(), s.getProgrammeName());
@@ -445,6 +434,33 @@ public class StudentService {
 
     private static CentreView centre(Student s) {
         return new CentreView(s.getCentreCode(), s.getCentreName(), s.getCentreShortName());
+    }
+
+    /** W-22b edits that go into the record's change history (B3); programme, level and centre have their own history. */
+    private static final Map<String, String> OFFICE_FIELDS = new LinkedHashMap<>(Map.of("matricNumber", "MATRIC_NUMBER", "surname", "SURNAME",
+            "firstName", "FIRST_NAME", "otherNames", "OTHER_NAMES", "email", "EMAIL", "phone", "PHONE"));
+
+    private static String str(Object o) {
+        return o == null ? null : o.toString();
+    }
+
+    /** B3: an activated student hears when the office changes her email (old and new address) or phone. */
+    private void tellStudentOfContactChange(Student s, Map<String, Object> before, Map<String, Object> after) {
+        if (s.getActivatedAt() == null) return;
+        List<String> lines = new ArrayList<>();
+        boolean email = !Objects.equals(before.get("email"), after.get("email"));
+        if (email) lines.add("Email: " + (s.getEmail() == null ? "removed" : ProfileRules.maskEmail(s.getEmail())));
+        if (!Objects.equals(before.get("phone"), after.get("phone"))) lines.add("Phone number: " + (s.getPhone() == null ? "removed" : ProfileRules.maskPhone(s.getPhone())));
+        if (lines.isEmpty()) return;
+        profileHistory.tellContactChanged(s, lines, true);
+        Object old = before.get("email");
+        if (email && old != null) {
+            Student copy = new Student();
+            copy.setFirstName(s.getFirstName());
+            copy.setEmail(old.toString());
+            copy.setId(s.getId());
+            profileHistory.tellContactChanged(copy, lines, true);   // no userId: email only, to the old address
+        }
     }
 
     private static Map<String, Object> snapshot(Student s) {

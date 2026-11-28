@@ -58,6 +58,15 @@ public class Student {
     private UUID importId;
     private Instant createdAt;
     private Instant updatedAt;
+    // ---- B3 profile (changelog 003) ----
+    private String addressLine;
+    private String addressTown;
+    private String addressState;
+    private String nextOfKinName;
+    private String nextOfKinRelationship;
+    private String nextOfKinPhone;
+    private String photoKey;
+    private Instant photoUpdatedAt;
 
     public String fullName() {
         return firstName + (otherNames == null || otherNames.isBlank() ? "" : " " + otherNames) + " " + surname;

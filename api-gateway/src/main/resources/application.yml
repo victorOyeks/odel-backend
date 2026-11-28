@@ -48,7 +48,7 @@ spring:
         - id: student-service
           uri: http://${STUDENT_HOST:127.0.0.1}:9305
           predicates:
-            - Path=/api/v1/students,/api/v1/students/**,/api/v1/imports/**,/api/v1/student-profile,/api-docs/student
+            - Path=/api/v1/students,/api/v1/students/**,/api/v1/imports/**,/api/v1/student-profile,/api/v1/student-profile/**,/api-docs/student
         - id: registration-service
           uri: http://${REGISTRATION_HOST:127.0.0.1}:9307
           predicates:
