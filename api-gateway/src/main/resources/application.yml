@@ -53,6 +53,11 @@ spring:
           uri: http://${REGISTRATION_HOST:127.0.0.1}:9307
           predicates:
             - Path=/api/v1/registration/**,/api/v1/dev/registration/**,/api-docs/registration
+        # B3 teach and learn; /api/v1/content/webhooks/bunny is Bunny Stream's (public) webhook.
+        - id: content-service
+          uri: http://${CONTENT_HOST:127.0.0.1}:9308
+          predicates:
+            - Path=/api/v1/content/**,/api/v1/dev/content/**,/api-docs/content
 
 odel:
   internal-api-key: ${ODEL_INTERNAL_API_KEY:dev-internal-key}
@@ -78,6 +83,8 @@ springdoc:
         url: /api-docs/payment
       - name: registration-service
         url: /api-docs/registration
+      - name: content-service
+        url: /api-docs/content
 
 management:
   endpoints:

@@ -15,6 +15,9 @@ public interface RegistrationCourseRepository extends JpaRepository<Registration
     @Query("select c from RegistrationCourse c where c.registrationId in ?1")
     List<RegistrationCourse> forRegistrations(Collection<UUID> registrationIds);
 
+    @Query("select c.registrationId from RegistrationCourse c where c.courseId = ?1")
+    List<UUID> registrationIdsForCourse(UUID courseId);
+
     @Query("select count(c) > 0 from RegistrationCourse c where c.carryOverId = ?1")
     boolean usesCarryOver(UUID carryOverId);
 }

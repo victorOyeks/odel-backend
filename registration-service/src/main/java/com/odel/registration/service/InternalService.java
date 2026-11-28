@@ -36,6 +36,19 @@ public class InternalService {
                 r.getTotalUnits())).orElse(new StudentCourses(false, sem, null, null, List.of(), 0)));
     }
 
+    /** Everyone registered for a course in a semester (default: the current one), by name. */
+    public CourseStudents courseStudents(UUID courseId, UUID semesterId) {
+        UUID sem = semesterId != null ? semesterId : calendar.pick(null).semesterId();
+        if (sem == null) return new CourseStudents(null, List.of());
+        return tx.execute(t -> {
+            Set<UUID> ids = new HashSet<>(courses.registrationIdsForCourse(courseId));
+            return new CourseStudents(sem, registrations.forSemester(sem).stream().filter(r -> ids.contains(r.getId()))
+                    .sorted(Comparator.comparing(Registration::getStudentName, String.CASE_INSENSITIVE_ORDER))
+                    .map(r -> new CourseStudent(r.getStudentId(), r.getUserId(), r.getMatricNumber(), r.getStudentName(), r.getCentreId(),
+                            r.getCentreCode(), r.getCentreName())).toList());
+        });
+    }
+
     public StudentSummary studentSummary(UUID studentId) {
         CalendarService.Choice c = calendar.pick(null);
         if (c.none()) return new StudentSummary(null, null, c.window().state().name(), false, 0, 0, null, 0);

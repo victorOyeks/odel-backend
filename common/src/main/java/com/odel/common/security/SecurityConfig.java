@@ -41,7 +41,9 @@ public class SecurityConfig {
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                     .ignoringRequestMatchers("/api/v1/auth/dev/**", "/api/v1/dev/storage/**", "/internal/**",
                             // Paystack posts webhooks without a session or CSRF token; the HMAC signature is checked instead (B2).
-                            "/api/v1/payments/webhooks/**", "/api/v1/dev/payments/**"))
+                            "/api/v1/payments/webhooks/**", "/api/v1/dev/payments/**",
+                            // Bunny Stream's encoding webhook (checked against Bunny's API) and the fake video host's upload (B3).
+                            "/api/v1/content/webhooks/**", "/api/v1/dev/content/videos/**"))
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .httpBasic(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
@@ -60,6 +62,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/auth/student/**").permitAll()
                     // Paystack's webhook (signature required, checked by payment-service) (B2).
                     .requestMatchers("/api/v1/payments/webhooks/**").permitAll()
+                    // Bunny Stream's webhook (content-service looks the video up through Bunny's API before trusting it) (B3).
+                    .requestMatchers("/api/v1/content/webhooks/**").permitAll()
                     .requestMatchers("/api/v1/session", "/api/v1/session/**", "/api/v1/auth/mfa/**",
                             "/api/v1/auth/sign-out", "/api/v1/me/active-role").authenticated()
                     .requestMatchers("/api/v1/platform/**").hasAuthority("ROLE_SUPER_ADMIN")

@@ -18,6 +18,11 @@ public final class InternalDtos {
 
     public record Summary(UUID semesterId, long registered, long lateRequestsPending, long changeRequestsPending, List<CentreCount> byCentre) {}
 
+    /** A student registered for a course in a semester (content-service's class list, B3). */
+    public record CourseStudent(UUID studentId, UUID userId, String matricNumber, String fullName, UUID centreId, String centreCode, String centreName) {}
+
+    public record CourseStudents(UUID semesterId, List<CourseStudent> items) {}
+
     public record CentreMoved(UUID centreId, String centreCode, String centreName) {}
 
     public record CentreMovedResult(int requestsMoved, int registrationsMoved) {}

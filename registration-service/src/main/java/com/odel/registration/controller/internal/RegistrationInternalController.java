@@ -27,6 +27,13 @@ public class RegistrationInternalController {
         return internal.courses(studentId, semesterId);
     }
 
+    /** content-service (B3): the class list of a course in a semester. */
+    @GetMapping("/courses/{courseId}/students")
+    public CourseStudents courseStudents(@PathVariable UUID courseId, @RequestParam(required = false) UUID semesterId) {
+        TenantContext.require();
+        return internal.courseStudents(courseId, semesterId);
+    }
+
     /** Home and dashboards: registered or not, courses and units, open requests. */
     @GetMapping("/students/{studentId}/summary")
     public StudentSummary studentSummary(@PathVariable UUID studentId) {

@@ -31,7 +31,7 @@ jobs:
         env:
           REQUESTED: ${{ github.event.inputs.services }}
         run: |
-          all='["api-gateway","identity-service","tenant-service","notification-service","academic-service","student-service","payment-service","registration-service"]'
+          all='["api-gateway","identity-service","tenant-service","notification-service","academic-service","student-service","payment-service","registration-service","content-service"]'
           if [ -z "$REQUESTED" ] || [ "$REQUESTED" = "all" ]; then
             echo "services=$all" >> "$GITHUB_OUTPUT"
           else
@@ -70,6 +70,10 @@ jobs:
               - 'payment-service/**'
             registration-service:
               - 'registration-service/**'
+              - 'common/**'
+
+            content-service:
+              - 'content-service/**'
               - 'common/**'
 
       - id: pick
@@ -135,7 +139,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: CHANGED_SERVICES,DEPLOY_SHA
           command_timeout: 30m
-          # Restart order: tenant (the gateway and identity ask it about universities) → identity → academic → student → payment → registration → notification → gateway.
+          # Restart order: tenant (the gateway and identity ask it about universities) → identity → academic → student → payment → registration → content → notification → gateway.
           # Each service gets a health-checked restart with automatic rollback if it doesn't come back up.
           script: |
             set -e
@@ -152,6 +156,7 @@ jobs:
             health_urls["student-service"]="http://127.0.0.1:9305/actuator/health"
             health_urls["payment-service"]="http://127.0.0.1:9306/actuator/health"
             health_urls["registration-service"]="http://127.0.0.1:9307/actuator/health"
+            health_urls["content-service"]="http://127.0.0.1:9308/actuator/health"
 
             ordered=(
               tenant-service
@@ -160,6 +165,7 @@ jobs:
               student-service
               payment-service
               registration-service
+              content-service
               notification-service
               api-gateway
             )
