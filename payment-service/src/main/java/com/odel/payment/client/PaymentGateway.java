@@ -25,16 +25,17 @@ public interface PaymentGateway {
     /** Charge API, USSD: ussdType is the bank's short code (737 GTBank, 919 UBA, 822 Sterling, 966 Zenith). */
     UssdCode chargeUssd(Charge charge, String ussdType);
 
-    record TransferAccount(String bankName, String accountNumber, String accountName, Instant expiresAt) {}
+    /** amountKobo: what Paystack expects into this account (the fee plus its charge when the student pays the charge). */
+    record TransferAccount(String bankName, String accountNumber, String accountName, Instant expiresAt, long amountKobo) {}
 
     /** Charge API, pay with transfer: a one-time account for this exact amount. */
     TransferAccount chargeTransfer(Charge charge, Instant expiresAt);
 
     /**
-     * GET /transaction/verify. status: success | failed | abandoned | ongoing | pending | processing | queued | reversed | not_found.
+     * GET /transaction/verify. amountKobo is what we asked for (the fee); chargedKobo what the payer was charged. status: success | failed | abandoned | ongoing | pending | processing | queued | reversed | not_found.
      */
     record Verification(String status, long amountKobo, String currency, String channel, String gatewayResponse, Instant paidAt,
-                        Long feesKobo, String transactionId, String cardType, String cardBank, String cardLast4) {
+                        Long feesKobo, String transactionId, String cardType, String cardBank, String cardLast4, Long chargedKobo) {
         public boolean success() { return "success".equals(status); }
         public boolean failed() { return "failed".equals(status) || "reversed".equals(status); }
     }

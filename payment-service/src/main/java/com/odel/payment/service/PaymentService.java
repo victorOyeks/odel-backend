@@ -163,6 +163,7 @@ public class PaymentService {
                         p.setTransferBank(a.bankName());
                         p.setTransferAccountNumber(a.accountNumber());
                         p.setTransferAccountName(a.accountName());
+                        p.setChargedKobo(a.amountKobo());
                         p.setExpiresAt(a.expiresAt());
                     }
                 }
@@ -224,7 +225,7 @@ public class PaymentService {
         if (message == null) return v;
         return new PaymentView(v.id(), v.feeId(), v.label(), v.reference(), v.method(), v.methodLabel(), v.amount(), v.amountLabel(), v.status(),
                 v.statusLabel(), message, v.startedAt(), v.paidAt(), v.expiresAt(), v.checkout(), v.ussd(), v.transfer(), v.failureReason(),
-                v.receiptUrl(), v.refund(), v.duplicate());
+                v.receiptUrl(), v.refund(), v.duplicate(), v.charge());
     }
 
     public PaymentView get(CurrentUser cu, UUID id) {

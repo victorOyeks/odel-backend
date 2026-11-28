@@ -85,18 +85,19 @@ public class FakeGateway implements PaymentGateway {
     public TransferAccount chargeTransfer(Charge charge, Instant expiresAt) {
         Txn t = open(charge, "bank_transfer");
         t.status = "pending";
-        return new TransferAccount("Paystack-Titan", "99" + String.format("%08d", RANDOM.nextInt(100_000_000)), "PAYSTACK CHECKOUT", expiresAt);
+        return new TransferAccount("Paystack-Titan", "99" + String.format("%08d", RANDOM.nextInt(100_000_000)), "PAYSTACK CHECKOUT", expiresAt,
+                com.odel.payment.service.GatewayCharge.estimatedTotal(charge.amountKobo()));
     }
 
     @Override
     public Verification verify(String reference) {
         Txn t = txns.get(reference);
-        if (t == null) return new Verification("not_found", 0, "NGN", null, "Transaction reference not found", null, null, null, null, null, null);
+        if (t == null) return new Verification("not_found", 0, "NGN", null, "Transaction reference not found", null, null, null, null, null, null, null);
         boolean card = "card".equals(t.channel);
         boolean paid = t.paidAt != null;
         return new Verification(t.status, t.amountKobo, "NGN", t.channel, t.gatewayResponse, t.paidAt,
-                paid ? fees(t.amountKobo) : null, String.valueOf(t.id), card && paid ? "visa DEBIT" : null, card && paid ? "GTBank" : null,
-                card && paid ? "4412" : null);
+                paid ? fees(com.odel.payment.service.GatewayCharge.estimatedTotal(t.amountKobo)) : null, String.valueOf(t.id), card && paid ? "visa DEBIT" : null, card && paid ? "GTBank" : null,
+                card && paid ? "4412" : null, paid ? com.odel.payment.service.GatewayCharge.estimatedTotal(t.amountKobo) : null);
     }
 
     /** Paystack's local fee: 1.5% + ₦100, capped at ₦2,000. */

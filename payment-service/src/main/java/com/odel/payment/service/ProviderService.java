@@ -193,7 +193,7 @@ public class ProviderService {
     // ------------------------------------------------------------------ settlement
 
     record SRow(UUID tenantId, String reference, String matric, String label, Instant paidAt, String channel, String method, long amount,
-                long provider, long centre, Long fee, String status) {}
+                long provider, long centre, Long fee, String status, Long charged) {}
 
     public Settlement settlement(LocalDate from, LocalDate to, UUID tenantId, int page, int size) {
         LocalDate today = LocalDate.now(clock.withZone(Labels.LAGOS));
@@ -207,38 +207,41 @@ public class ProviderService {
         if (tenantId != null) { extra = " and tenant_id = ?"; args.add(tenantId); }
         List<SRow> rows = jdbc.query("""
                 select tenant_id, reference, matric_number, fee_label, paid_at, channel, method, amount_kobo, provider_share_kobo, centre_share_kobo,
-                       gateway_fee_kobo, status
+                       gateway_fee_kobo, status, charged_kobo
                 from payments where paid_at >= ? and paid_at < ? and status in ('PAID', 'REFUNDING', 'REFUNDED', 'REVERSED')""" + extra
                         + " order by paid_at desc",
                 (rs, i) -> new SRow(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4), rs.getTimestamp(5).toInstant(),
                         rs.getString(6), rs.getString(7), rs.getLong(8), rs.getLong(9), rs.getLong(10),
-                        rs.getObject(11) == null ? null : rs.getLong(11), rs.getString(12)), args.toArray());
+                        rs.getObject(11) == null ? null : rs.getLong(11), rs.getString(12), rs.getObject(13) == null ? null : rs.getLong(13)), args.toArray());
         Map<UUID, String> names = new HashMap<>();
         Map<UUID, long[]> per = new LinkedHashMap<>();
-        long[] tot = new long[6];
+        long[] tot = new long[7]; // payments, gross, provider, centre, gateway fees, refunded, provider net
         for (SRow r : rows) {
             names.computeIfAbsent(r.tenantId(), id -> { try { return peers.tenant(id).name(); } catch (Exception e) { return "Unknown university"; } });
             long fee = r.fee() == null ? 0 : r.fee();
             long refunded = "REFUNDING".equals(r.status()) || "REFUNDED".equals(r.status()) ? r.amount() : 0;
-            long[] u = per.computeIfAbsent(r.tenantId(), k -> new long[6]);
+            long net = GatewayCharge.providerNet(r.provider(), r.amount(), r.charged(), r.fee());
+            long[] u = per.computeIfAbsent(r.tenantId(), k -> new long[7]);
             for (long[] a : new long[][]{u, tot}) {
-                a[0]++; a[1] += r.amount(); a[2] += r.provider(); a[3] += r.centre(); a[4] += fee; a[5] += refunded;
+                a[0]++; a[1] += r.amount(); a[2] += r.provider(); a[3] += r.centre(); a[4] += fee; a[5] += refunded; a[6] += net;
             }
         }
         List<SettlementUniversity> unis = per.entrySet().stream().map(e -> {
             long[] a = e.getValue();
             return new SettlementUniversity(e.getKey(), names.get(e.getKey()), a[0], Money.naira(a[1]), Money.naira(a[2]), Money.naira(a[3]),
-                    Money.naira(a[4]), Money.naira(a[2] - a[4]), Money.naira(a[5]));
+                    Money.naira(a[4]), Money.naira(a[6]), Money.naira(a[5]));
         }).sorted(Comparator.comparing(SettlementUniversity::name, String.CASE_INSENSITIVE_ORDER)).toList();
         int s = Math.max(1, Math.min(size, 500));
         int p = Math.max(page, 0);
         List<SettlementItem> items = rows.stream().skip((long) p * s).limit(s).map(r -> {
             long fee = r.fee() == null ? 0 : r.fee();
             return new SettlementItem(r.reference(), names.get(r.tenantId()), r.matric(), r.label(), r.paidAt(), methodShort(r.channel(), r.method()),
-                    Money.naira(r.amount()), Money.naira(r.provider()), Money.naira(r.centre()), Money.naira(fee), Money.naira(r.provider() - fee), r.status());
+                    Money.naira(r.amount()), Money.naira(r.provider()), Money.naira(r.centre()), Money.naira(fee),
+                    Money.naira(GatewayCharge.providerNet(r.provider(), r.amount(), r.charged(), r.fee())), r.status(),
+                    Money.naira(GatewayCharge.studentCharge(r.amount(), r.charged())));
         }).toList();
         return new Settlement(f, t, new SettlementTotals(tot[0], Money.naira(tot[1]), Money.naira(tot[2]), Money.naira(tot[3]), Money.naira(tot[4]),
-                Money.naira(tot[2] - tot[4]), Money.naira(tot[5])), unis, items, p, s, rows.size());
+                Money.naira(tot[6]), Money.naira(tot[5])), unis, items, p, s, rows.size());
     }
 
     static String methodShort(String channel, String method) {

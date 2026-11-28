@@ -38,11 +38,11 @@ class FeeLedgerTest {
 
     static Verification ok(long amount) {
         return new Verification("success", amount, "NGN", "card", "Successful", Instant.parse("2026-12-04T13:28:00Z"), 32_500L,
-                "4099260516", "visa DEBIT", "GTBank", "4412");
+                "4099260516", "visa DEBIT", "GTBank", "4412", amount + 32_995L);
     }
 
     static Verification status(String s, String response) {
-        return new Verification(s, 1_500_000, "NGN", "card", response, null, null, null, null, null, null);
+        return new Verification(s, 1_500_000, "NGN", "card", response, null, null, null, null, null, null, null);
     }
 
     @Test

@@ -93,8 +93,10 @@ public class PaystackGateway implements PaymentGateway {
         String number = d.path("account_number").asText(null);
         if (number == null) throw new GatewayException(text(d.path("display_text"), "Paystack did not give an account to pay into. Try again or pay by card."));
         Instant exp = parseTime(d.path("account_expires_at").asText(null));
+        // With the charge passed to the customer, Paystack expects the fee plus its charge (₦15,329.95 for ₦15,000).
+        long expected = d.path("amount").asLong(0) > 0 ? d.path("amount").asLong() : charge.amountKobo();
         return new TransferAccount(d.path("bank").path("name").asText("Paystack-Titan"), number, d.path("account_name").asText(null),
-                exp == null ? expiresAt : exp);
+                exp == null ? expiresAt : exp, expected);
     }
 
     @Override
@@ -104,7 +106,7 @@ public class PaystackGateway implements PaymentGateway {
             d = get("/transaction/verify/" + reference);
         } catch (GatewayException e) {
             if (e.getMessage() != null && e.getMessage().toLowerCase().contains("not found")) {
-                return new Verification("not_found", 0, "NGN", null, e.getMessage(), null, null, null, null, null, null);
+                return new Verification("not_found", 0, "NGN", null, e.getMessage(), null, null, null, null, null, null, null);
             }
             throw e;
         }
@@ -116,7 +118,8 @@ public class PaystackGateway implements PaymentGateway {
         return new Verification(d.path("status").asText("pending"), amount, d.path("currency").asText("NGN"),
                 d.path("channel").asText(null), d.path("gateway_response").asText(null), parseTime(d.path("paid_at").asText(null)),
                 d.hasNonNull("fees") ? d.path("fees").asLong() : null, d.path("id").asText(null),
-                auth.path("card_type").asText(null), auth.path("bank").asText(null), auth.path("last4").asText(null));
+                auth.path("card_type").asText(null), auth.path("bank").asText(null), auth.path("last4").asText(null),
+                d.hasNonNull("amount") ? d.path("amount").asLong() : null);
     }
 
     @Override

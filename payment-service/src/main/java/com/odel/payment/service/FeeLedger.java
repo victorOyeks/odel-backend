@@ -40,6 +40,7 @@ public final class FeeLedger {
         p.setCardBank(v.cardBank());
         p.setCardLast4(v.cardLast4());
         p.setGatewayFeeKobo(v.feesKobo());
+        if (v.chargedKobo() != null) p.setChargedKobo(v.chargedKobo());
         p.setGatewayTransactionId(v.transactionId());
         p.setGatewayMessage(v.gatewayResponse());
         p.setPaidAt(v.paidAt() == null ? now : v.paidAt());

@@ -46,6 +46,8 @@ public class Payment {
     private long providerShareKobo;
     private long centreShareKobo;
     private Long gatewayFeeKobo;
+    /** What the student was (or, for an open transfer, is to be) charged in total: the fee plus Paystack's charge when they pay it. */
+    private Long chargedKobo;
     private String subaccountCode;
     private String email;
     private String authorizationUrl;
@@ -72,4 +74,6 @@ public class Payment {
     private Instant lastCheckedAt;
     private Instant createdAt;
     private Instant updatedAt;
+    public Long getChargedKobo() { return chargedKobo; }
+    public void setChargedKobo(Long chargedKobo) { this.chargedKobo = chargedKobo; }
 }

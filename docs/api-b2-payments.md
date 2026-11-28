@@ -259,3 +259,14 @@ The fake gateway keeps its transactions in memory and posts **signed** webhooks 
 (unused: hosted checkout), `ODEL_PAYSTACK_BASE_URL` (default `https://api.paystack.co`), `ODEL_PAYMENT_DEFAULT_FEE` (15000),
 `ODEL_PAYMENT_CENTRE_SHARE` (3000), `ODEL_PAYMENTS_URL` (other services → payment-service, default `http://127.0.0.1:9306`),
 dev seed: `ODEL_PAYSTACK_TEST_BANK_CODE` / `ODEL_PAYSTACK_TEST_ACCOUNT` / `ODEL_PAYMENT_SEED_SLUG` (default `wesley`) for Wesley's test-mode subaccount.
+
+## Paystack's charge: the student pays it (owner decision, 28 Nov 2026)
+- Paystack's "pass charges to customer" must be on in the Paystack dashboard (dev: on; production: set it before launch). Paystack then grosses up: ₦15,000 → **₦15,329.95** (1.5% + ₦100, the ₦100 waived under ₦2,500, the charge capped at ₦2,000).
+- `ODEL_PAYMENT_CHARGE_BEARER` = `STUDENT` (default) or `PROVIDER` (if the dashboard setting is ever turned off); it only changes the estimate shown.
+- Fee card (`GET /payments/fees/current`, `/payments/fees`) and every payment view carry `charge`:
+  `{"studentPays":true,"fee":15000,"charge":329.95,"total":15329.95,"feeLabel":"₦15,000","chargeLabel":"₦329.95","totalLabel":"₦15,329.95","estimate":true,"note":"Paystack adds its charge of about ₦329.95, so you pay about ₦15,329.95. Paystack shows the exact amount before you confirm."}`.
+  Before paying `estimate:true`; once Paystack has given the figure (transfer account, verified payment) `estimate:false` with the real amounts.
+- Bank transfer: `transfer.amount`/`amountLabel` is what Paystack expects into the one-time account (₦15,329.95), and the note says so. Sending ₦15,000 would not complete the payment.
+- Verification compares Paystack's `requested_amount` with the fee; the amount charged is stored as `charged_kobo` (002-charged-amount.sql).
+- Receipt PDF: "Platform fee NGN 15,000.00 / Paystack charge NGN 329.95 / Total paid NGN 15,329.95".
+- Settlement: `items[].studentCharge`; `providerNet` = provider share − the part of Paystack's fee the student did not cover (₦12,000 when the student paid the charge).

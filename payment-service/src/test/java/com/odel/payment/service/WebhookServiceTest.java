@@ -29,7 +29,7 @@ class WebhookServiceTest {
     final byte[] body = "{\"event\":\"charge.success\",\"data\":{\"id\":4099260516,\"reference\":\"WU-PF-882134\",\"status\":\"success\",\"amount\":1500000}}"
             .getBytes(StandardCharsets.UTF_8);
     final PaymentGateway.Verification ok = new PaymentGateway.Verification("success", 1_500_000, "NGN", "card", "Successful",
-            Instant.now(), 32_500L, "4099260516", null, null, null);
+            Instant.now(), 32_995L, "4099260516", null, null, null, 1_532_995L);
 
     @BeforeEach
     void setUp() {

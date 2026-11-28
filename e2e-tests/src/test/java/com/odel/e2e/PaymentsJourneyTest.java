@@ -397,7 +397,7 @@ class PaymentsJourneyTest {
         chidiTransferRef = p.get("reference").asText();
         assertThat(p.at("/transfer/bankName").asText()).isEqualTo("Paystack-Titan");
         assertThat(p.at("/transfer/accountNumber").asText()).matches("\\d{10}");
-        assertThat(p.at("/transfer/amountLabel").asText()).isEqualTo("₦15,000.00");
+        assertThat(p.at("/transfer/amountLabel").asText()).isEqualTo("₦15,329.95"); // the fee plus Paystack's charge: the student pays it (owner, 28 Nov)
         Instant expires = Instant.parse(p.at("/transfer/expiresAt").asText());
         assertThat(expires).isBetween(Instant.now().plusSeconds(28 * 60), Instant.now().plusSeconds(31 * 60));
 
@@ -545,14 +545,16 @@ class PaymentsJourneyTest {
         assertThat(s.at("/totals/provider").asInt()).isEqualTo(72000);
         assertThat(s.at("/totals/centre").asInt()).isEqualTo(18000);
         assertThat(s.at("/totals/refunded").asInt()).isEqualTo(15000);
-        assertThat(s.at("/totals/gatewayFees").asInt()).isEqualTo(6 * 325);
-        assertThat(s.at("/totals/providerNet").asInt()).isEqualTo(72000 - 6 * 325);
+        assertThat(s.at("/totals/gatewayFees").decimalValue()).isEqualByComparingTo("1979.64"); // 6 × ₦329.94 on the grossed-up ₦15,329.95
+        assertThat(s.at("/totals/providerNet").asInt()).isEqualTo(72000); // the students covered Paystack's charge
         assertThat(s.get("universities").size()).isEqualTo(1);
         assertThat(s.at("/universities/0/name").asText()).startsWith("Wesley University");
         for (JsonNode i : s.get("items")) {
             assertThat(i.get("provider").asInt()).isEqualTo(12000);
             assertThat(i.get("centre").asInt()).isEqualTo(3000);
-            assertThat(i.get("gatewayFee").asInt()).isEqualTo(325);
+            assertThat(i.get("gatewayFee").decimalValue()).isEqualByComparingTo("329.94");
+            assertThat(i.get("studentCharge").decimalValue()).isEqualByComparingTo("329.95");
+            assertThat(i.get("providerNet").asInt()).isEqualTo(12000);
         }
         assertThat(s.get("items").findValuesAsText("reference")).contains(adeolaPaidRef1, chidiTransferRef, bayoTransferRef);
         JsonNode list = ok(chuka.get("/api/v1/platform/payments/universities"), 200);

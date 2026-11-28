@@ -25,6 +25,13 @@ public final class PaymentDtos {
 
     public record Reversal(UUID paymentId, String reference, Instant reversedAt, String message) {}
 
+    /**
+     * Paystack's charge as the student sees it. Before paying it is an estimate (estimate=true; Paystack works out the exact
+     * charge); after paying it is what Paystack charged. studentPays=false: the provider bears the charge and total = fee.
+     */
+    public record ChargeView(boolean studentPays, BigDecimal fee, BigDecimal charge, BigDecimal total, String feeLabel, String chargeLabel,
+                             String totalLabel, boolean estimate, String note) {}
+
     public record CheckoutView(String authorizationUrl) {}
 
     public record UssdView(String bank, String code, Instant expiresAt) {}
@@ -35,12 +42,12 @@ public final class PaymentDtos {
     public record PaymentView(UUID id, UUID feeId, String label, String reference, String method, String methodLabel, BigDecimal amount,
                               String amountLabel, String status, String statusLabel, String message, Instant startedAt, Instant paidAt,
                               Instant expiresAt, CheckoutView checkout, UssdView ussd, TransferView transfer, String failureReason,
-                              String receiptUrl, RefundView refund, boolean duplicate) {}
+                              String receiptUrl, RefundView refund, boolean duplicate, ChargeView charge) {}
 
     public record FeeView(UUID id, UUID semesterId, UUID sessionId, String sessionName, int semesterNumber, String semesterName, String label,
                           BigDecimal amount, String amountLabel, String status, String statusLabel, String message, boolean locked,
                           PaymentView openPayment, PaidRef paidPayment, Duplicate duplicate, Reversal reversal, List<MethodOption> methods,
-                          List<UssdBank> ussdBanks, String ussdOtherBanks, List<String> actions) {}
+                          List<UssdBank> ussdBanks, String ussdOtherBanks, List<String> actions, ChargeView charge) {}
 
     public record Items<T>(List<T> items) {}
 
@@ -106,7 +113,7 @@ public final class PaymentDtos {
 
     public record SettlementItem(String reference, String university, String matricNumber, String label, Instant paidAt, String method,
                                  BigDecimal amount, BigDecimal provider, BigDecimal centre, BigDecimal gatewayFee, BigDecimal providerNet,
-                                 String status) {}
+                                 String status, BigDecimal studentCharge) {}
 
     public record Settlement(LocalDate from, LocalDate to, SettlementTotals totals, List<SettlementUniversity> universities,
                              List<SettlementItem> items, int page, int size, long total) {}

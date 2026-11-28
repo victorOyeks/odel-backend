@@ -53,19 +53,47 @@ public final class Views {
         };
     }
 
+    /** What the student pays for this payment: Paystack's figure when known (transfer account, verified payment), else the estimate. */
+    static long toPay(Payment p) {
+        return p.getChargedKobo() != null ? p.getChargedKobo() : GatewayCharge.estimatedTotal(p.getAmountKobo());
+    }
+
+    /** Before paying: the fee, Paystack's estimated charge and the estimated total. */
+    public static ChargeView estimate(long feeKobo) {
+        long total = GatewayCharge.estimatedTotal(feeKobo);
+        long charge = total - feeKobo;
+        return new ChargeView(GatewayCharge.studentPays(), Money.naira(feeKobo), Money.naira(charge), Money.naira(total), Money.label(feeKobo),
+                Money.exact(charge), Money.exact(total), true, charge == 0 ? null
+                : "Paystack adds its charge of about " + Money.exact(charge) + ", so you pay about " + Money.exact(total)
+                  + ". Paystack shows the exact amount before you confirm.");
+    }
+
+    /** For one payment: Paystack's real figures once known, the estimate before. */
+    static ChargeView charge(Payment p) {
+        if (p.getChargedKobo() == null) return estimate(p.getAmountKobo());
+        long total = p.getChargedKobo();
+        long charge = Math.max(0, total - p.getAmountKobo());
+        boolean paid = p.getPaidAt() != null;
+        return new ChargeView(charge > 0, Money.naira(p.getAmountKobo()), Money.naira(charge), Money.naira(total), Money.label(p.getAmountKobo()),
+                Money.exact(charge), Money.exact(total), false, charge == 0 ? null
+                : (paid ? "You paid " : "You pay ") + Money.exact(total) + ": the " + Money.label(p.getAmountKobo()) + " fee and Paystack's " + Money.exact(charge) + " charge.");
+    }
+
     public static PaymentView payment(Payment p, Refund r) {
         boolean open = p.getStatus().open();
         CheckoutView checkout = p.getMethod() == Payment.Method.CARD && open && p.getAuthorizationUrl() != null ? new CheckoutView(p.getAuthorizationUrl()) : null;
         UssdView ussd = p.getMethod() == Payment.Method.USSD && open ? new UssdView(UssdBanks.name(p.getUssdBank()), p.getUssdCode(), p.getExpiresAt()) : null;
         TransferView transfer = p.getMethod() == Payment.Method.BANK_TRANSFER && open && p.getTransferAccountNumber() != null
-                ? new TransferView(p.getTransferBank(), p.getTransferAccountNumber(), p.getTransferAccountName(), Money.naira(p.getAmountKobo()),
-                Money.exact(p.getAmountKobo()), p.getExpiresAt(),
-                "Send exactly " + Money.exact(p.getAmountKobo()) + " in one transfer. This account works for 30 minutes.") : null;
+                ? new TransferView(p.getTransferBank(), p.getTransferAccountNumber(), p.getTransferAccountName(), Money.naira(toPay(p)),
+                Money.exact(toPay(p)), p.getExpiresAt(),
+                "Send exactly " + Money.exact(toPay(p)) + " in one transfer" + (toPay(p) > p.getAmountKobo()
+                        ? " (the " + Money.exact(p.getAmountKobo()) + " fee plus Paystack's " + Money.exact(toPay(p) - p.getAmountKobo()) + " charge)" : "")
+                        + ". This account works for 30 minutes.") : null;
         boolean receipt = p.getStatus() == Payment.Status.PAID || (p.getPaidAt() != null && !p.isDuplicate());
         return new PaymentView(p.getId(), p.getFeeId(), p.getFeeLabel(), p.getReference(), Labels.methodKey(p), Labels.method(p),
                 Money.naira(p.getAmountKobo()), Money.label(p.getAmountKobo()), p.getStatus().name(), Labels.paymentStatus(p.getStatus()),
                 message(p), p.getCreatedAt(), p.getPaidAt(), p.getExpiresAt(), checkout, ussd, transfer,
-                p.getStatus() == Payment.Status.FAILED ? message(p) : null, receipt ? receiptUrl(p) : null, refund(p, r), p.isDuplicate());
+                p.getStatus() == Payment.Status.FAILED ? message(p) : null, receipt ? receiptUrl(p) : null, refund(p, r), p.isDuplicate(), charge(p));
     }
 
     static String feeMessage(String status, Fee fee, Payment paid, Payment reversed) {
@@ -105,6 +133,6 @@ public final class Views {
                 dup == null ? null : new Duplicate(dup.getId(), dup.getReference(), dup.getPaidAt(), Money.naira(dup.getAmountKobo()),
                         Money.label(dup.getAmountKobo()), refund(dup, refunds.get(dup.getId()))),
                 rev == null ? null : new Reversal(rev.getId(), rev.getReference(), rev.getReversedAt(), feeMessage(status, fee, paid, rev)),
-                METHODS, UssdBanks.ALL, UssdBanks.OTHERS, actions);
+                METHODS, UssdBanks.ALL, UssdBanks.OTHERS, actions, estimate(fee.getAmountKobo()));
     }
 }
