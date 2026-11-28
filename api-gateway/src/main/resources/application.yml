@@ -18,6 +18,11 @@ spring:
         response-timeout: 20s
       routes:
         # Paths stay /api/v1/... end to end; each service owns its prefixes. /internal/** is never routed.
+        # Before tenant-service's /api/v1/public/**: slip verification belongs to registration-service.
+        - id: registration-public
+          uri: http://${REGISTRATION_HOST:127.0.0.1}:9307
+          predicates:
+            - Path=/api/v1/public/registration/**
         - id: identity-service
           uri: http://${IDENTITY_HOST:127.0.0.1}:9301
           predicates:
@@ -38,6 +43,10 @@ spring:
           uri: http://${STUDENT_HOST:127.0.0.1}:9305
           predicates:
             - Path=/api/v1/students,/api/v1/students/**,/api/v1/imports/**,/api/v1/student-profile,/api-docs/student
+        - id: registration-service
+          uri: http://${REGISTRATION_HOST:127.0.0.1}:9307
+          predicates:
+            - Path=/api/v1/registration/**,/api/v1/dev/registration/**,/api-docs/registration
 
 odel:
   internal-api-key: ${ODEL_INTERNAL_API_KEY:dev-internal-key}
@@ -59,6 +68,8 @@ springdoc:
         url: /api-docs/academic
       - name: student-service
         url: /api-docs/student
+      - name: registration-service
+        url: /api-docs/registration
 
 management:
   endpoints:

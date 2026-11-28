@@ -32,6 +32,31 @@ public class StudentInternalController {
         return students.contact(userId);
     }
 
+    /** registration-service (B2): one student, by id, by account or by matric number, and the whole roster. */
+    @GetMapping("/roster")
+    public Roster roster() {
+        TenantContext.require();
+        return students.roster();
+    }
+
+    @GetMapping("/by-user/{userId}")
+    public StudentRef byUser(@PathVariable UUID userId) {
+        TenantContext.require();
+        return students.refByUser(userId);
+    }
+
+    @GetMapping("/by-matric")
+    public StudentRef byMatric(@RequestParam String matric) {
+        TenantContext.require();
+        return students.refByMatric(matric);
+    }
+
+    @GetMapping("/{id:[0-9a-fA-F\\-]{36}}")
+    public StudentRef one(@PathVariable UUID id) {
+        TenantContext.require();
+        return students.ref(id);
+    }
+
     /** identity-service: the student activated and accepted the privacy notice. */
     @PostMapping("/activated")
     public ResponseEntity<Void> activated(@RequestBody Activated body) {

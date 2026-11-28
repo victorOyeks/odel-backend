@@ -40,10 +40,15 @@ public class StudentService {
     private final AuditService audit;
     private final TransactionTemplate tx;
     private final Clock clock;
+    private final CentreMoveRepository centreMoves;
+    private final CentreMoveService moveService;
 
     public StudentService(StudentRepository students, StudentStatusChangeRepository history, StudentImportRepository imports,
                           StudentBulkRepository bulk, IdentityClient identity, AcademicLookupService academic, WelcomeService welcome,
-                          ActorService actors, AuditService audit, TransactionTemplate tx, Clock clock) {
+                          ActorService actors, AuditService audit, TransactionTemplate tx, Clock clock, CentreMoveRepository centreMoves,
+                          @org.springframework.context.annotation.Lazy CentreMoveService moveService) {
+        this.centreMoves = centreMoves;
+        this.moveService = moveService;
         this.students = students;
         this.history = history;
         this.imports = imports;
@@ -122,7 +127,7 @@ public class StudentService {
                     s.getEntrySession(), s.getStatus().name(), s.getStatus().label(),
                     new Account(s.getWelcomeSentAt(), s.getActivatedAt(), s.getConsentAt() == null ? null : new Consent(s.getConsentVersion(), s.getConsentAt()),
                             a == null ? null : a.lastSignInAt(), a == null ? null : a.lockedUntil()),
-                    h, s.getCreatedAt(), ref);
+                    h, s.getCreatedAt(), ref, centreMoves.findByStudentIdOrderByCreatedAtDesc(s.getId()).stream().map(CentreMoveService::view).toList());
         });
     }
 
@@ -179,7 +184,6 @@ public class StudentService {
         Map<String, String> f = new LinkedHashMap<>();
         Student s = tx.execute(t -> students.findInTenant(id).orElseThrow(ApiException::notFound));
         Map<String, Object> before = snapshot(s), after;
-        String oldCentre = s.getCentreName();
 
         if (in.surname() != null) { if (in.surname().isBlank()) f.put("surname", "Enter the surname."); else s.setSurname(clean(in.surname())); }
         if (in.firstName() != null) { if (in.firstName().isBlank()) f.put("firstName", "Enter the first name."); else s.setFirstName(clean(in.firstName())); }
@@ -222,19 +226,25 @@ public class StudentService {
                 && !prog.get().levels().contains(s.getLevel())) {
             f.put("level", "Level " + s.getLevel() + " is not offered for " + prog.get().name() + ".");
         }
-        if (in.centreCode() != null) {
+        // A centre change is a move (A-06): reason, effective date, emails, history and the hand-over of open requests.
+        boolean moving = false;
+        if (in.centreCode() != null && !in.centreCode().isBlank()) {
             var c = academic.centre(in.centreCode());
             if (c.isEmpty()) f.put("centreCode", "Choose a centre from Centres.");
-            else {
-                s.setCentreId(c.get().id());
-                s.setCentreCode(c.get().code());
-                s.setCentreName(c.get().name());
-                s.setCentreShortName(c.get().shortName());
+            else if (!c.get().code().equalsIgnoreCase(s.getCentreCode())) {
+                moving = true;
+                if (in.centreChangeReason() == null || in.centreChangeReason().trim().length() < 3) {
+                    f.put("centreChangeReason", "Say why the student is moving centre.");
+                }
             }
         }
         if (!f.isEmpty()) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", f.values().iterator().next(), f);
         after = snapshot(s);
-        if (after.equals(before)) return record(id);
+        if (after.equals(before)) {
+            if (moving) moveService.record(cu, id, new com.odel.student.dto.CentreMoveDtos.MoveRequest(in.centreCode(), in.centreChangeReason(),
+                    in.centreEffectiveOn()), "centreChangeReason");
+            return record(id);
+        }
         Instant now = clock.instant();
         s.setUpdatedAt(now);
         tx.executeWithoutResult(t -> {
@@ -247,12 +257,9 @@ public class StudentService {
             before.forEach((k, v) -> { if (!Objects.equals(v, after.get(k))) { oldV.put(k, v); newV.put(k, after.get(k)); } });
             audit.record(new AuditService.Entry(s.getTenantId(), actor, "STUDENT_UPDATED", "student", s.getId(),
                     actor.name() + " changed " + s.displayName() + "'s record (" + String.join(", ", newV.keySet()) + ")", oldV, newV));
-            if (!Objects.equals(oldCentre, s.getCentreName())) {
-                audit.record(new AuditService.Entry(s.getTenantId(), actor, "STUDENT_CENTRE_CHANGED", "student", s.getId(),
-                        actor.name() + " moved " + s.displayName() + " from " + oldCentre + " to " + s.getCentreName(),
-                        Map.of("centre", oldCentre), Map.of("centre", s.getCentreName())));
-            }
         });
+        if (moving) moveService.record(cu, id, new com.odel.student.dto.CentreMoveDtos.MoveRequest(in.centreCode(), in.centreChangeReason(),
+                in.centreEffectiveOn()), "centreChangeReason");
         return record(id);
     }
 
@@ -362,6 +369,29 @@ public class StudentService {
                     .map(AcademicLookup.Centre::phone).filter(Objects::nonNull).findFirst().orElse(null);
             return new Contact(s.getId(), s.getFirstName(), new ContactCentre(s.getCentreName(), phone));
         }).orElseThrow(ApiException::notFound));
+    }
+
+    /** registration-service: one student (by student id, user id or matric number), and every student of the university. */
+    public StudentRef ref(UUID id) {
+        return tx.execute(t -> students.findInTenant(id).map(StudentService::ref).orElseThrow(ApiException::notFound));
+    }
+
+    public StudentRef refByUser(UUID userId) {
+        return tx.execute(t -> students.findByUserId(userId).map(StudentService::ref).orElseThrow(ApiException::notFound));
+    }
+
+    public StudentRef refByMatric(String matric) {
+        String m = matric == null ? "" : matric.replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
+        return tx.execute(t -> students.findByMatricNumber(m).map(StudentService::ref).orElseThrow(ApiException::notFound));
+    }
+
+    public Roster roster() {
+        return tx.execute(t -> new Roster(students.findAll(Sort.by("surname", "firstName", "matricNumber")).stream().map(StudentService::ref).toList()));
+    }
+
+    static StudentRef ref(Student s) {
+        return new StudentRef(s.getId(), s.getUserId(), s.getMatricNumber(), s.displayName(), s.getFirstName(), s.getEmail(), s.getProgrammeId(),
+                s.getProgrammeCode(), s.getProgrammeName(), s.getLevel(), s.getCentreId(), s.getCentreCode(), s.getCentreName(), s.getStatus().name());
     }
 
     /** identity-service: the student activated. Safe to call twice. */

@@ -31,7 +31,7 @@ jobs:
         env:
           REQUESTED: ${{ github.event.inputs.services }}
         run: |
-          all='["api-gateway","identity-service","tenant-service","notification-service","academic-service","student-service"]'
+          all='["api-gateway","identity-service","tenant-service","notification-service","academic-service","student-service","registration-service"]'
           if [ -z "$REQUESTED" ] || [ "$REQUESTED" = "all" ]; then
             echo "services=$all" >> "$GITHUB_OUTPUT"
           else
@@ -64,6 +64,10 @@ jobs:
 
             student-service:
               - 'student-service/**'
+              - 'common/**'
+
+            registration-service:
+              - 'registration-service/**'
               - 'common/**'
 
       - id: pick
@@ -129,7 +133,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: CHANGED_SERVICES,DEPLOY_SHA
           command_timeout: 30m
-          # Restart order: tenant (the gateway and identity ask it about universities) → identity → academic → student → notification → gateway.
+          # Restart order: tenant (the gateway and identity ask it about universities) → identity → academic → student → registration → notification → gateway.
           # Each service gets a health-checked restart with automatic rollback if it doesn't come back up.
           script: |
             set -e
@@ -144,12 +148,14 @@ jobs:
             health_urls["notification-service"]="http://127.0.0.1:9303/actuator/health"
             health_urls["academic-service"]="http://127.0.0.1:9304/actuator/health"
             health_urls["student-service"]="http://127.0.0.1:9305/actuator/health"
+            health_urls["registration-service"]="http://127.0.0.1:9307/actuator/health"
 
             ordered=(
               tenant-service
               identity-service
               academic-service
               student-service
+              registration-service
               notification-service
               api-gateway
             )

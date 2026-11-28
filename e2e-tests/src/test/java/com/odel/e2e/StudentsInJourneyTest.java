@@ -583,8 +583,11 @@ class StudentsInJourneyTest {
         noMail.put("firstName", "Remi");
         assertThat(ngoziB.post("/api/v1/students", noMail).status()).as("a student with no email can be added").isEqualTo(201);
 
-        // W-22b edit, with audit; the centre change works until B2's move flow.
-        Browser.Res edited = ngoziB.send("PATCH", "/api/v1/students/" + graceId, Map.of("centreCode", "LAG", "phone", "08065550192"), "application/json");
+        // W-22b edit, with audit; a centre change is a move (B2, A-06) and needs a reason.
+        Browser.Res noReason = ngoziB.send("PATCH", "/api/v1/students/" + graceId, Map.of("centreCode", "LAG"), "application/json");
+        assertThat(noReason.json().at("/fields/centreChangeReason").asText()).isEqualTo("Say why the student is moving centre.");
+        Browser.Res edited = ngoziB.send("PATCH", "/api/v1/students/" + graceId,
+                Map.of("centreCode", "LAG", "centreChangeReason", "Lives in Lagos now", "phone", "08065550192"), "application/json");
         assertThat(edited.status()).as(edited.body()).isEqualTo(200);
         assertThat(edited.json().at("/centre/code").asText()).isEqualTo("LAG");
         assertThat(edited.json().get("phone").asText()).isEqualTo("0806 555 0192");

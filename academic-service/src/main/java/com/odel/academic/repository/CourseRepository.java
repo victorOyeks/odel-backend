@@ -20,6 +20,10 @@ public interface CourseRepository extends JpaRepository<Course, UUID> {
     @Query("select c from Course c where upper(replace(c.code, ' ', '')) = upper(replace(?1, ' ', ''))")
     Optional<Course> findByCode(String code);
 
+    /** Several by id within the current university (registration-service's carry-overs and slips). */
+    @Query("select c from Course c where c.id in ?1")
+    List<Course> findAllInTenant(java.util.Collection<UUID> ids);
+
     @Query("select c from Course c order by c.code")
     List<Course> sorted();
 }

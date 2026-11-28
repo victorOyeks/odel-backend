@@ -29,13 +29,13 @@ public final class StudentDtos {
     public record Record(UUID id, String matricNumber, String surname, String firstName, String otherNames, String fullName, String email,
                          String phone, String gender, LocalDate dateOfBirth, ProgrammeView programme, int level, String levelLabel,
                          CentreView centre, String entrySession, String status, String statusLabel, Account account,
-                         List<HistoryItem> history, Instant createdAt, ImportRef importedFrom) {}
+                         List<HistoryItem> history, Instant createdAt, ImportRef importedFrom, List<CentreMoveDtos.Move> centreMoves) {}
 
     public record AddRequest(String surname, String firstName, String otherNames, String matricNumber, String programmeCode, Integer level,
                              String centreCode, String email, String phone, Boolean sendWelcome) {}
 
     public record UpdateRequest(String surname, String firstName, String otherNames, String matricNumber, String email, String phone,
-                                String programmeCode, Integer level, String centreCode) {}
+                                String programmeCode, Integer level, String centreCode, String centreChangeReason, LocalDate centreEffectiveOn) {}
 
     public record SuspendRequest(String reason) {}
 
@@ -67,4 +67,11 @@ public final class StudentDtos {
     public record Contact(UUID studentId, String firstName, ContactCentre centre) {}
 
     public record Activated(UUID userId, Instant activatedAt, String consentVersion, Instant consentAt) {}
+
+    /** registration-service (B2): one student as other services need them. */
+    public record StudentRef(UUID id, UUID userId, String matricNumber, String fullName, String firstName, String email, UUID programmeId,
+                             String programmeCode, String programmeName, int level, UUID centreId, String centreCode, String centreName,
+                             String status) {}
+
+    public record Roster(List<StudentRef> items) {}
 }

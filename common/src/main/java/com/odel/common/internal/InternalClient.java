@@ -50,6 +50,18 @@ public class InternalClient {
         call(() -> spec(http.delete().uri(base(s) + path)).retrieve().toBodilessEntity());
     }
 
+    /**
+     * The same calls to a service given by its base URL (a service whose address lives in the caller's own settings, e.g.
+     * registration-service -> payment-service, student-service -> registration-service).
+     */
+    public <T> T getAt(String baseUrl, String path, Class<T> type) {
+        return call(() -> spec(http.get().uri(baseUrl + path)).retrieve().body(type));
+    }
+
+    public <T> T postAt(String baseUrl, String path, Object body, Class<T> type) {
+        return call(() -> spec(http.post().uri(baseUrl + path)).contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(type));
+    }
+
     @SuppressWarnings("unchecked")
     private <S extends RestClient.RequestHeadersSpec<?>> S spec(S spec) {
         spec.header(InternalKeyFilter.HEADER, props.internalApiKey());

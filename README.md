@@ -10,7 +10,8 @@ project, one Spring Boot service per module, one Postgres database (a schema per
 | `tenant-service` | 9302 | Universities (tenants), branding, provider console |
 | `notification-service` | 9303 | Email (Brevo), in-app bell, browser push, templates, background job queue |
 | `academic-service` | 9304 | Sessions and semesters, faculties → departments → programmes, course catalogue, study centres and rooms, staffing, versioned grading rules, structure and catalogue CSV imports, the setup checklist (schema `academic`) |
-| `student-service` | 9305 | Student records and history, portal CSV import (row-by-row check, then confirm), welcome emails and delivery report, students list and record (schema `student`) |
+| `student-service` | 9305 | Student records and history, portal CSV import (row-by-row check, then confirm), welcome emails and delivery report, students list and record, moving a student to another centre (schema `student`) |
+| `registration-service` | 9307 | Course registration per semester: window, compulsory / elective / carry-over courses, unit limits, the fee block (asks payment-service), PDF slip, late registration and course changes decided by the centre coordinator, the registrations report and rules (schema `registration`) |
 | `common` | (library) | Errors, tenancy, sessions and security, audit log, signed file links, internal calls |
 | `e2e-tests` | (tests) | Each build phase's end-to-end journey, run against a running stack |
 
@@ -66,9 +67,11 @@ Offline Maven (this machine cannot reach Maven Central): `.mvn/maven.config` let
 
 ## Tests
 
-`mvn verify` runs each module's unit tests. The journeys run through the gateway of a running stack (all six services):
+`mvn verify` runs each module's unit tests. The journeys run through the gateway of a running stack (every service):
 `PlatformBaseJourneyTest` (B0: provider creates a university, its first admin signs in with two-step codes),
-`AcademicSetupJourneyTest` (B1: W-10 set-up, People & roles, audit log) and `StudentsInJourneyTest` (B1: import, welcome
+`AcademicSetupJourneyTest` (B1: W-10 set-up, People & roles, audit log), `RegistrationJourneyTest` (B2: course registration,
+slip, late and change requests, coordinator scope, A-07, the centre move; run registration-service with `ODEL_FEE_CHECK=stub` until
+payment-service is merged) and `StudentsInJourneyTest` (B1: import, welcome
 emails, student activation, sign-in and reset, the 3,504-row timing; it builds its programmes and centres through academic-service).
 
 ```bash
