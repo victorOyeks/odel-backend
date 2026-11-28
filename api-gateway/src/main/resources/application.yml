@@ -18,6 +18,12 @@ spring:
         response-timeout: 20s
       routes:
         # Paths stay /api/v1/... end to end; each service owns its prefixes. /internal/** is never routed.
+        # payment-service comes first: its /api/v1/platform/payments/** sits inside tenant-service's /api/v1/platform/**.
+        - id: payment-service
+          uri: http://${PAYMENT_HOST:127.0.0.1}:9306
+          order: -1
+          predicates:
+            - Path=/api/v1/payments,/api/v1/payments/**,/api/v1/fees/**,/api/v1/platform/payments/**,/api/v1/dev/payments/**,/api-docs/payment
         - id: identity-service
           uri: http://${IDENTITY_HOST:127.0.0.1}:9301
           predicates:
@@ -59,6 +65,8 @@ springdoc:
         url: /api-docs/academic
       - name: student-service
         url: /api-docs/student
+      - name: payment-service
+        url: /api-docs/payment
 
 management:
   endpoints:

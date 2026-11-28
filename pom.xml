@@ -26,6 +26,7 @@
         <module>notification-service</module>
         <module>academic-service</module>
         <module>student-service</module>
+        <module>payment-service</module>
         <module>e2e-tests</module>
     </modules>
 

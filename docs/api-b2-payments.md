@@ -132,7 +132,7 @@ One row per student (students who never paid included, as "Not paid"):
 `q` matches name, matric number or reference; `from`/`to` filter on the payment date (Africa/Lagos days). Newest payment first,
 students who never paid last (by matric number).
 
-### `GET /fees/payments/export.csv` (same filters) → `student,matric_number,centre,programme,level,status,method,reference,date,amount`.
+### `GET /fees/payments/export.csv` (same filters) → `student,matric_number,centre,programme,level,status,method,reference,date`.
 
 ### `GET /fees/students/{studentId}?semesterId=` (A-02 a student's payment record)
 `{"student":{…},"fee":<fee>,"attempts":[Payment…]}` (refund and reversal details included).
