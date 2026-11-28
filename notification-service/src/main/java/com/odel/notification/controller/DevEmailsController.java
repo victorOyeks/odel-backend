@@ -1,5 +1,8 @@
 package com.odel.notification.controller;
 
+import com.odel.common.security.Access;
+import com.odel.common.security.CurrentUserArg;
+import com.odel.common.security.Role;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,7 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-/** Development only (the dev sign-in stand-in is on): the last 20 emails, sent, skipped or logged; ?to= narrows to one address. */
+/**
+ * Development only (the dev sign-in stand-in is on): the last 20 emails, sent, skipped or logged; ?to= narrows to one address.
+ * The emails hold sign-in, activation and reset codes for every university, so only a signed-in platform admin may read them.
+ */
 @RestController
 @ConditionalOnProperty(name = "odel.google.dev-stub", havingValue = "true")
 public class DevEmailsController {
@@ -20,7 +26,8 @@ public class DevEmailsController {
     }
 
     @GetMapping("/api/v1/dev/emails")
-    public List<Map<String, Object>> emails(@RequestParam(required = false) String to) {
+    public List<Map<String, Object>> emails(CurrentUserArg.Holder cu, @RequestParam(required = false) String to) {
+        Access.require(cu.user(), Role.SUPER_ADMIN);
         if (to != null && !to.isBlank()) {
             return jdbc.queryForList("""
                     select created_at, tenant_id, to_address, subject, status, last_error, body,

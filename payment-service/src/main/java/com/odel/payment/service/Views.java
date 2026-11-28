@@ -98,7 +98,7 @@ public final class Views {
 
     static String feeMessage(String status, Fee fee, Payment paid, Payment reversed) {
         return switch (status) {
-            case "PAID" -> "Paid on " + Labels.day(fee.getPaidAt()) + ". Registration is open to you.";
+            case "PAID" -> "Paid on " + Labels.day(fee.getPaidAt()) + ". Registration and exams are unlocked for this semester.";
             case "CONFIRMING" -> "We are waiting for your bank to confirm your payment. Do not pay again.";
             case "REFUNDED" -> "Your payment was refunded. Pay again to register your courses and sit exams.";
             case "REVERSED" -> "Your bank took back the " + Money.label(fee.getAmountKobo()) + " you paid"

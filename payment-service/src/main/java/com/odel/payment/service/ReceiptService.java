@@ -47,14 +47,13 @@ public class ReceiptService {
         if (st != null && st.programme() != null) rows.put("Programme", st.programme().name() + " · " + st.levelLabel());
         rows.put("Session", fee.getSessionName());
         rows.put("Semester", Fee.semesterName(fee.getSemesterNumber()));
-        rows.put("Fee", "Platform fee");
         long charge = GatewayCharge.studentCharge(p.getAmountKobo(), p.getChargedKobo());
         if (charge > 0) {
             rows.put("Platform fee", Money.ngn(p.getAmountKobo()));
             rows.put("Paystack charge", Money.ngn(charge));
             rows.put("Total paid", Money.ngn(p.getChargedKobo()));
         } else {
-            rows.put("Amount", Money.ngn(p.getAmountKobo()));
+            rows.put("Platform fee", Money.ngn(p.getAmountKobo()));
         }
         rows.put("Paid on", Labels.dayTime(p.getPaidAt()));
         rows.put("Method", Labels.method(p));
