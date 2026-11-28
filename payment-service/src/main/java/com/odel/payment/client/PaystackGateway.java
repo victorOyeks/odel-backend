@@ -109,7 +109,11 @@ public class PaystackGateway implements PaymentGateway {
             throw e;
         }
         JsonNode auth = d.path("authorization");
-        return new Verification(d.path("status").asText("pending"), d.path("amount").asLong(), d.path("currency").asText("NGN"),
+        // When the account passes Paystack's charge on to the customer, `amount` includes that charge (₦15,000 becomes ₦15,329.95);
+        // `requested_amount` is what we asked for, so that is what the fee is checked against.
+        long requested = d.path("requested_amount").asLong(0);
+        long amount = requested > 0 ? requested : d.path("amount").asLong();
+        return new Verification(d.path("status").asText("pending"), amount, d.path("currency").asText("NGN"),
                 d.path("channel").asText(null), d.path("gateway_response").asText(null), parseTime(d.path("paid_at").asText(null)),
                 d.hasNonNull("fees") ? d.path("fees").asLong() : null, d.path("id").asText(null),
                 auth.path("card_type").asText(null), auth.path("bank").asText(null), auth.path("last4").asText(null));
