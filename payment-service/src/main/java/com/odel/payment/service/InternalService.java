@@ -39,12 +39,21 @@ public class InternalService {
     private FeeStatus status(UUID studentId, Semester sem, Fee fee, Payment open) {
         if (fee == null) {
             long kobo = feeService.settings(TenantContext.require()).feeKobo();
-            return new FeeStatus(studentId, sem.id(), sem.label(), "NOT_PAID", false, null, null, Money.naira(kobo));
+            return new FeeStatus(studentId, sem.id(), sem.label(), "NOT_PAID", "NOT_PAID", false, null, null, Money.naira(kobo));
         }
         String s = FeeLedger.effectiveStatus(fee, open);
         Payment paid = fee.getStatus() == Fee.Status.PAID && fee.getPaidPaymentId() != null ? payments.findInTenant(fee.getPaidPaymentId()).orElse(null) : null;
-        return new FeeStatus(studentId, sem.id(), fee.label(), s, "PAID".equals(s), fee.getStatus() == Fee.Status.PAID ? fee.getPaidAt() : null,
+        return new FeeStatus(studentId, sem.id(), fee.label(), simple(s), s, "PAID".equals(s), fee.getStatus() == Fee.Status.PAID ? fee.getPaidAt() : null,
                 paid == null ? null : paid.getReference(), Money.naira(fee.getAmountKobo()));
+    }
+
+    /** Registration's three states: a refunded or reversed fee is simply not paid. */
+    static String simple(String feeStatus) {
+        return switch (feeStatus) {
+            case "PAID" -> "PAID";
+            case "CONFIRMING" -> "CONFIRMING";
+            default -> "NOT_PAID";
+        };
     }
 
     public FeeStatus feeStatus(UUID studentId, UUID userId, UUID semesterId) {

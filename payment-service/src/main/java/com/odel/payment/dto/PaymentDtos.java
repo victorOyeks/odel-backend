@@ -113,8 +113,12 @@ public final class PaymentDtos {
 
     // ------------------------------------------------------------------ internal
 
-    public record FeeStatus(UUID studentId, UUID semesterId, String label, String status, boolean paid, Instant paidAt, String reference,
-                            BigDecimal amount) {}
+    /**
+     * status: PAID | NOT_PAID | CONFIRMING (what registration and exams act on; a reversed or refunded fee is NOT_PAID, a refunded
+     * duplicate leaves it PAID); feeStatus carries the detail (NOT_PAID, CONFIRMING, PAID, REFUNDED, REVERSED).
+     */
+    public record FeeStatus(UUID studentId, UUID semesterId, String label, String status, String feeStatus, boolean paid, Instant paidAt,
+                            String reference, BigDecimal amount) {}
 
     public record FeeStatusesRequest(UUID semesterId, List<UUID> studentIds) {}
 

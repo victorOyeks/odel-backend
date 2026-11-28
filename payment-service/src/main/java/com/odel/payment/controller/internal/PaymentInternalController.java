@@ -24,7 +24,7 @@ public class PaymentInternalController {
         return internal.feeStatus(studentId, userId, semesterId);
     }
 
-    @PostMapping("/fee-statuses")
+    @PostMapping({"/fee-status/bulk", "/fee-statuses"})
     public Items<FeeStatus> feeStatuses(@RequestBody FeeStatusesRequest body) {
         TenantContext.require();
         return internal.feeStatuses(body);

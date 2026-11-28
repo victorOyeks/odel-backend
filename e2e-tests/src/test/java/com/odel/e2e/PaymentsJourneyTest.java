@@ -49,7 +49,7 @@ class PaymentsJourneyTest {
     final HttpClient raw = HttpClient.newHttpClient();
 
     Browser chuka, ngoziB, yemiB, adeola, chidi, bayo;
-    String wesleyId, crestId, sem1, sem2, adeolaStudentId, kunleStudentId;
+    String wesleyId, crestId, sem1, sem2, adeolaStudentId, kunleStudentId, chidiStudentId, bayoStudentId;
     String adeolaPaid1, adeolaPaidRef1, chidiTransferRef, bayoCardId, bayoCardRef, bayoTransferRef;
     final List<String> wesleyRefs = new ArrayList<>();
     JsonNode firstWebhook;
@@ -216,8 +216,8 @@ class PaymentsJourneyTest {
                 "phone", "0803 555 0117")), 201);
 
         adeolaStudentId = addStudent("WU/ODL/24/0153", "Okafor", "Adeola", adeolaEmail);
-        addStudent("WU/ODL/24/0154", "Nwosu", "Chidi", chidiEmail);
-        addStudent("WU/ODL/24/0688", "Adewale", "Bayo", bayoEmail);
+        chidiStudentId = addStudent("WU/ODL/24/0154", "Nwosu", "Chidi", chidiEmail);
+        bayoStudentId = addStudent("WU/ODL/24/0688", "Adewale", "Bayo", bayoEmail);
         kunleStudentId = addStudent("WU/ODL/24/0172", "Bamidele", "Kunle", "kunle.bamidele@" + studentMail);
         adeola = activate("WU/ODL/24/0153", adeolaEmail);
         chidi = activate("WU/ODL/24/0154", chidiEmail);
@@ -459,7 +459,7 @@ class PaymentsJourneyTest {
         assertThat(f.at("/duplicate/refund/expectedBy").asText()).isNotBlank();
         JsonNode dup = ok(bayo.get("/api/v1/payments/" + t.get("id").asText()), 200);
         assertThat(dup.get("status").asText()).isEqualTo("REFUNDING");
-        assertThat(dup.get("receiptUrl").isNull() || dup.get("receiptUrl").isMissingNode()).isTrue();
+        assertThat(dup.has("receiptUrl")).as("no receipt for a refunded duplicate").isFalse();
         assertThat(email(bayoEmail, "You paid twice", 30)).as("E-07 email").isNotNull();
 
         // E-07b: the refund reaches him.
@@ -535,7 +535,7 @@ class PaymentsJourneyTest {
     }
 
     @Test
-    @Order(10)
+    @Order(11)
     void theProviderSeesTheSplit() {
         String today = LocalDate.now(ZoneId.of("Africa/Lagos")).toString();
         JsonNode s = ok(chuka.get("/api/v1/platform/payments/settlement?from=" + today + "&to=" + today + "&tenantId=" + wesleyId + "&size=100"), 200);
@@ -559,10 +559,55 @@ class PaymentsJourneyTest {
         assertThat(list.get("items").findValuesAsText("tenantId")).contains(wesleyId, crestId);
     }
 
+    // ------------------------------------------------------------------ what registration asks (internal, straight to the service)
+
+    JsonNode internal(String method, String path, String body) throws Exception {
+        String url = Optional.ofNullable(System.getenv("ODEL_E2E_PAYMENTS_URL")).orElse("http://127.0.0.1:9306");
+        String key = Optional.ofNullable(System.getenv("ODEL_E2E_INTERNAL_KEY")).orElse("dev-internal-key");
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url + path)).header("X-Internal-Key", key)
+                .header("X-Odel-Tenant-Id", wesleyId).header("Content-Type", "application/json")
+                .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
+        HttpResponse<String> res = raw.send(b.build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(res.statusCode()).as(res.body()).isEqualTo(200);
+        return new com.fasterxml.jackson.databind.ObjectMapper().readTree(res.body());
+    }
+
+    @Test
+    @Order(10)
+    void registrationsFeeStatus() throws Exception {
+        try {
+            raw.send(HttpRequest.newBuilder(URI.create(Optional.ofNullable(System.getenv("ODEL_E2E_PAYMENTS_URL")).orElse("http://127.0.0.1:9306")
+                    + "/actuator/health")).build(), HttpResponse.BodyHandlers.discarding());
+        } catch (Exception e) {
+            Assumptions.abort("payment-service is not reachable directly (internal calls are not routed by the gateway)");
+        }
+        JsonNode a = internal("GET", "/internal/payments/fee-status?studentId=" + adeolaStudentId + "&semesterId=" + sem1, null);
+        assertThat(a.get("status").asText()).isEqualTo("PAID");
+        assertThat(a.get("paid").asBoolean()).isTrue();
+        assertThat(a.get("reference").asText()).isEqualTo(adeolaPaidRef1);
+        assertThat(a.get("paidAt").asText()).isNotBlank();
+        // A reversal is NOT_PAID for registration (detail in feeStatus); a refunded duplicate left Bayo's fee paid until then.
+        JsonNode b = internal("GET", "/internal/payments/fee-status?studentId=" + bayoStudentId + "&semesterId=" + sem1, null);
+        assertThat(b.get("status").asText()).isEqualTo("NOT_PAID");
+        assertThat(b.get("feeStatus").asText()).isEqualTo("REVERSED");
+        assertThat(b.get("paid").asBoolean()).isFalse();
+        // No fee record: 200 NOT_PAID, never 404.
+        JsonNode none = internal("GET", "/internal/payments/fee-status?studentId=" + UUID.randomUUID() + "&semesterId=" + sem1, null);
+        assertThat(none.get("status").asText()).isEqualTo("NOT_PAID");
+        // The current semester by default.
+        assertThat(internal("GET", "/internal/payments/fee-status?studentId=" + chidiStudentId, null).get("status").asText()).isEqualTo("PAID");
+        JsonNode bulk = internal("POST", "/internal/payments/fee-status/bulk", "{\"semesterId\":\"" + sem1 + "\",\"studentIds\":[\""
+                + adeolaStudentId + "\",\"" + chidiStudentId + "\",\"" + bayoStudentId + "\",\"" + kunleStudentId + "\"]}");
+        assertThat(bulk.get("items").findValuesAsText("status")).containsExactly("PAID", "PAID", "NOT_PAID", "NOT_PAID");
+        JsonNode sum = internal("GET", "/internal/payments/summary?semesterId=" + sem1, null);
+        assertThat(sum.get("paid").asInt()).isEqualTo(2);
+        assertThat(sum.get("reversed").asInt()).isEqualTo(1);
+    }
+
     // ------------------------------------------------------------------ tenant isolation
 
     @Test
-    @Order(11)
+    @Order(12)
     void anotherUniversitySeesNothing() throws Exception {
         String json = "application/json";
         // Crestfield's admin, with Wesley's ids.

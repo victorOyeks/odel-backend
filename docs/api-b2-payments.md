@@ -218,9 +218,12 @@ the provider's ₦12,000, so the university's centre always receives exactly ₦
 
 ### payment-service provides
 - `GET /internal/payments/fee-status?studentId=&semesterId=` (or `userId=` instead of `studentId`; `semesterId` optional = current) →
-  `{"studentId","semesterId","label":"2026/2027 · 1st semester","status":"PAID","paid":true,"paidAt","reference","amount":15000}`.
-  A student with no fee row yet is `NOT_PAID`. For registration's fee block and, later, exam eligibility.
-- `POST /internal/payments/fee-statuses` `{"semesterId","studentIds":[…]}` → `{"items":[<fee-status>…]}` (lists, A-07).
+  `{"studentId","semesterId","label":"2026/2027 · 1st semester","status":"PAID","feeStatus":"PAID","paid":true,"paidAt","reference","amount":15000}`.
+  `studentId` is student-service's id, `semesterId` academic-service's. `status` is `PAID | NOT_PAID | CONFIRMING` (what registration
+  acts on): a reversed or refunded fee is `NOT_PAID`; a refunded duplicate leaves it `PAID`. `feeStatus` gives the detail
+  (`REVERSED`, `REFUNDED`…). No fee record yet → `200` `NOT_PAID` (never 404). For registration's fee block and, later, exam eligibility.
+- `POST /internal/payments/fee-status/bulk` `{"semesterId","studentIds":[…]}` → `{"items":[<fee-status>…]}` in the same order
+  (A-07; also at `/internal/payments/fee-statuses`).
 - `GET /internal/payments/summary?semesterId=` → `{"semesterId","paid":3012,"confirming":41,"refunded":0,"reversed":1,"paidStudentIds":[…]}`
   (dashboards; "paid, not registered" on A-07).
 
@@ -233,7 +236,7 @@ the provider's ₦12,000, so the university's centre always receives exactly ₦
   `GET /internal/students/directory/{studentId}` and `GET /internal/students/directory/by-user/{userId}` → one item (404 if none).
 - tenant-service `GET /internal/tenants/{id}` (name, colour, portal URL, `logoUrl` read from tenant-service for the crest) and (new)
   `GET /internal/tenants` → `[TenantView…]` for the provider's list.
-- notification-service `POST /internal/messages` with templates (changelog `006-payment-templates.sql`): `payment.receipt` (email with the
+- notification-service `POST /internal/messages` with templates (changelog `006-payment-templates.sql`; registration took 005): `payment.receipt` (email with the
   PDF attached + bell), `payment.duplicate_refund` (email + bell, E-07), `payment.refunded` (email), `payment.reversed` (email + bell,
   E-08). Messages may now carry `attachments: [{"fileName","contentType","base64"}]` (email only).
 
