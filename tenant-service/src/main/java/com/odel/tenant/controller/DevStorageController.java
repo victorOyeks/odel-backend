@@ -49,7 +49,12 @@ public class DevStorageController {
         Path p = storage.path(key);
         if (!Files.exists(p)) return ResponseEntity.notFound().build();
         MediaType type = key.endsWith(".svg") ? MediaType.valueOf("image/svg+xml")
-                : key.endsWith(".png") ? MediaType.IMAGE_PNG : MediaType.APPLICATION_OCTET_STREAM;
+                : key.endsWith(".png") ? MediaType.IMAGE_PNG
+                // B3 course files: PDFs open in the browser's viewer, audio plays (R2 keeps the uploader's type itself).
+                : key.endsWith(".pdf") ? MediaType.APPLICATION_PDF
+                : key.endsWith(".m4a") ? MediaType.valueOf("audio/mp4")
+                : key.endsWith(".mp3") ? MediaType.valueOf("audio/mpeg")
+                : MediaType.APPLICATION_OCTET_STREAM;
         return ResponseEntity.ok().contentType(type)
                 .header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
                 .header(HttpHeaders.CACHE_CONTROL, "private, max-age=300")

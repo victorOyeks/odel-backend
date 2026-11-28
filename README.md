@@ -13,6 +13,7 @@ project, one Spring Boot service per module, one Postgres database (a schema per
 | `student-service` | 9305 | Student records and history, portal CSV import (row-by-row check, then confirm), welcome emails and delivery report, students list and record, moving a student to another centre (schema `student`) |
 | `payment-service` | 9306 | The platform fee per student per semester: Paystack (hosted checkout, USSD and transfer by the Charge API) behind a `PaymentGateway` interface with a fake for local work, subaccount split (₦12,000 provider / ₦3,000 centre), signed and idempotent webhook, 30-minute re-check, automatic refund of a second payment, reversals, PDF receipts, the university's payments list and the provider's settlement report (schema `payment`) |
 | `registration-service` | 9307 | Course registration per semester: window, compulsory / elective / carry-over courses, unit limits, the fee block (asks payment-service), PDF slip, late registration and course changes decided by the centre coordinator, the registrations report and rules (schema `registration`) |
+| `content-service` | 9308 | Teach and learn: a course per semester (offering), weeks that open on a date, ordered items (videos on Bunny Stream behind a `VideoGateway` with a fake for local work, documents in storage, slides and notes converted to PDF by LibreOffice, links, text pages), signed playback per quality with sizes and an audio-only file, progress per student, the lecturer's progress table, announcements, copying last session's course (schema `content`) |
 | `common` | (library) | Errors, tenancy, sessions and security, audit log, signed file links, internal calls |
 | `e2e-tests` | (tests) | Each build phase's end-to-end journey, run against a running stack |
 
@@ -69,6 +70,13 @@ Payments run with the fake gateway locally (`ODEL_PAYSTACK_MODE=fake`, the defau
 webhook. With `ODEL_PAYSTACK_MODE=paystack` and `ODEL_PAYSTACK_SECRET_KEY` (environment only) it talks to api.paystack.co; Paystack's
 webhook URL is `https://<api host>/api/v1/payments/webhooks/paystack`.
 
+Videos run with the fake host locally (`ODEL_VIDEO_MODE=fake`, the default): an upload goes to `PUT /api/v1/dev/content/videos/{id}/upload`, the
+video becomes ready on its own after `ODEL_FAKE_VIDEO_READY_SECONDS` (20) or when `POST /api/v1/dev/content/videos/{id}/simulate` says so (READY,
+ENCODING, FAILED), and `POST /api/v1/dev/content/jobs/run` runs the conversion and audio jobs now. With `ODEL_VIDEO_MODE=bunny` and the
+`ODEL_BUNNY_*` keys (environment only) the browser uploads straight to Bunny Stream by TUS; Bunny's webhook URL is
+`https://<api host>/api/v1/content/webhooks/bunny`. Slides become PDFs only where LibreOffice (`soffice`) is installed; elsewhere they are
+kept as the original file. The audio-only file needs `ffmpeg`.
+
 Offline Maven (this machine cannot reach Maven Central): `.mvn/maven.config` lets Maven use what is in `~/.m2`; add `-o`.
 
 ## Tests
@@ -80,7 +88,10 @@ emails, student activation, sign-in and reset, the 3,504-row timing; it builds i
 `PaymentsJourneyTest` (B2 payments, fake gateway: fee cards, card declined and closed, paid by webhook before and after the browser returns,
 the same webhook twice, transfer confirmed later, USSD and the 30-minute re-check, paid twice and refunded, reversal, reports and the split)
 and `RegistrationJourneyTest` (B2: course registration, slip, late and change requests, coordinator scope, A-07, the centre move; it sets
-each student's fee answer through the dev-only `PUT /api/v1/dev/registration/fee-status`).
+each student's fee answer through the dev-only `PUT /api/v1/dev/registration/fee-status`) and `ContentJourneyTest` (B3: Dr Bello builds CSC 201 week 5
+with a video, notes, slides, a link and a page; the video is prepared by the fake Bunny host and its webhook, a second one fails and is uploaded again;
+Adeola watches at 360p, switches to audio, reads the slides and finishes the week; Dr Bello's progress table, the coordinator's centre-only view,
+the announcement by bell and email, the item menu, copying last session's course, and every refusal).
 
 ```bash
 ODEL_E2E_GATEWAY=http://localhost:9300 mvn -pl e2e-tests test -Dtest=PlatformBaseJourneyTest
@@ -97,7 +108,7 @@ Never edit a shipped file: add the next numbered one. `common/.../000-app.sql` (
 ## Deploying (dev)
 
 Push `develop`: `.github/workflows/deploy-dev.yml` builds the changed services, copies the jars to the dev VPS and restarts
-them in order (tenant, identity, academic, student, payment, notification, gateway) with a health check and rollback. One-time box set-up:
+them in order (tenant, identity, academic, student, payment, registration, content, notification, gateway) with a health check and rollback. One-time box set-up:
 `scripts/vps/bootstrap-dev.sh` (database, schemas, `/opt/odel-dev/.env.dev`, systemd units, nginx, certificates).
 
 | What | Where |
@@ -115,5 +126,7 @@ them in order (tenant, identity, academic, student, payment, notification, gatew
 - `docs/api-b1-academic.md`: B1 academic setup (sessions, structure, catalogue, centres, staffing, grading, checklist, People & roles, audit log).
 - `docs/api-b1-students.md`: B1 students (import, welcome emails, student activation, sign-in and reset).
 - `docs/api-b2-payments.md`: B2 payments (fees per semester, Paystack, webhook, receipts, reports, settlement accounts).
+- `docs/api-b2-registration.md`: B2 course registration (window, courses, slip, late and change requests, approvals, report, centre move).
+- `docs/api-b3-content.md`: B3 teach and learn (courses, weeks, items, uploads to Bunny Stream and storage, playback, progress, announcements, copy).
 - `docs/tech-stack.md`: what each technology is for.
 - Build plan: the "Build plan" tab of the presenter's guide (B0–B12).

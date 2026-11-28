@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: content-service
+  config:
+    import: classpath:odel-common.yml
+  datasource:
+    # One Postgres database; this service owns schema "content". "app" holds the shared audit log.
+    url: jdbc:postgresql://${ODEL_DB_HOST:localhost}:${ODEL_DB_PORT:5440}/${ODEL_DB_NAME:odel}?currentSchema=content,app
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    default-schema: content
+  jpa:
+    properties:
+      hibernate.default_schema: content
+
+server:
+  port: ${CONTENT_PORT:9308}
+
+springdoc:
+  api-docs:
+    path: /api-docs/content
+  swagger-ui:
+    enabled: false   # one Swagger UI for every service, on the api-gateway
+
+odel:
+  content:
+    # fake = in-memory stand-in for Bunny Stream (local, tests); bunny = the real library (dev server). Keys only from the environment.
+    video-mode: ${ODEL_VIDEO_MODE:fake}
+    bunny:
+      library-id: ${ODEL_BUNNY_LIBRARY_ID:}
+      cdn-host: ${ODEL_BUNNY_CDN_HOST:}
+      api-key: ${ODEL_BUNNY_API_KEY:}
+      read-only-api-key: ${ODEL_BUNNY_READ_ONLY_API_KEY:}
+      token-key: ${ODEL_BUNNY_TOKEN_KEY:}
+      # hs256 = Bunny's current advanced CDN token; sha256 = its earlier one. Switch if the CDN answers 403.
+      token-format: ${ODEL_BUNNY_TOKEN_FORMAT:hs256}
+      api-base: ${ODEL_BUNNY_API_BASE:https://video.bunnycdn.com}
+    soffice-path: ${ODEL_SOFFICE_PATH:soffice}
+    ffmpeg-path: ${ODEL_FFMPEG_PATH:ffmpeg}
+    registration-url: ${ODEL_REGISTRATION_URL:http://127.0.0.1:9307}
+    # Fake videos become ready on their own this many seconds after upload (0 = only by /dev/content/videos/{id}/simulate).
+    fake-ready-seconds: ${ODEL_FAKE_VIDEO_READY_SECONDS:20}
+    # Background jobs: slides/notes to PDF, audio files, the video re-check.
+    jobs-enabled: ${ODEL_CONTENT_JOBS:true}
+    dev-endpoints: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+odel:
+  content:
+    dev-endpoints: true

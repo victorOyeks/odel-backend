@@ -9,8 +9,8 @@ ENV_FILE=$ROOT/.env.dev
 DB_NAME=${DB_NAME:-odel}
 DB_USER=${DB_USER:-odel_user}
 DEPLOY_USER=${DEPLOY_USER:-$USER}
-SERVICES=(api-gateway identity-service tenant-service notification-service academic-service student-service payment-service registration-service)
-SCHEMAS=(app identity tenant notification academic student payment registration)
+SERVICES=(api-gateway identity-service tenant-service notification-service academic-service student-service payment-service registration-service content-service)
+SCHEMAS=(app identity tenant notification academic student payment registration content)
 DOMAINS=(odel-dev.oyeksglobal.com odel-console-dev.oyeksglobal.com odel-api-dev.oyeksglobal.com)
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 
@@ -23,12 +23,27 @@ say "1. What the box has"
 java -version 2>&1 | head -1 | grep -q '"21' || die "Java 21 is required."
 command -v node >/dev/null || die "node is required for the web app."
 avail_mb=$(awk '/MemAvailable/ {printf "%d", $2/1024}' /proc/meminfo)
-echo "  memory available: ${avail_mb} MB (ODeL needs about 3 GB: 4 JVMs at ~700 MB plus the web app)"
+echo "  memory available: ${avail_mb} MB (ODeL needs about 3 GB: the JVMs at ~700 MB plus the web app)"
 for port in 6379:Redis 5432:Postgres; do
   p=${port%%:*}; ss -ltn | grep -q ":$p " && ok "${port##*:} on :$p" || die "${port##*:} is not listening on :$p"
 done
 busy=$(ss -ltn | grep -E ':930[0-9] |:3100 ' || true)
 [ -n "$busy" ] && warn "ports 9300–9309/3100 already in use (fine on a re-run):\n$busy" || ok "ports 9300–9303 and 3100 are free"
+
+say "1b. Converters for course content (B3)"
+# LibreOffice headless turns slides and Word notes into a compressed PDF; ffmpeg makes each lecture's audio-only file.
+# Without them content-service keeps slides as the original file and plays the 240p stream for audio only.
+if command -v soffice >/dev/null; then
+  ok "LibreOffice $(soffice --version 2>/dev/null | head -1 | awk '{print $2}')"
+else
+  sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+    libreoffice-impress libreoffice-writer fonts-dejavu fonts-liberation >/dev/null && ok "LibreOffice installed"
+fi
+if command -v ffmpeg >/dev/null; then
+  ok "ffmpeg present"
+else
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ffmpeg >/dev/null && ok "ffmpeg installed"
+fi
 
 say "2. Directories"
 sudo mkdir -p "$ROOT/storage"
@@ -93,6 +108,13 @@ ODEL_BOOTSTRAP_SUPER_ADMIN_NAME=Chuka Obi
 #   ODEL_PAYSTACK_SECRET_KEY=sk_test_...
 # Without them payment-service uses the fake gateway.
 ODEL_PAYSTACK_MODE=fake
+
+# Videos (B3): bunny mode needs the library's keys, added by hand (never committed):
+#   ODEL_VIDEO_MODE=bunny
+#   ODEL_BUNNY_LIBRARY_ID=...  ODEL_BUNNY_CDN_HOST=vz-....b-cdn.net
+#   ODEL_BUNNY_API_KEY=...  ODEL_BUNNY_READ_ONLY_API_KEY=...  ODEL_BUNNY_TOKEN_KEY=...
+# Without them content-service uses the fake video host.
+ODEL_VIDEO_MODE=fake
 
 JAVA_OPTS=-Xms64m -Xmx320m -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=64m -XX:MaxDirectMemorySize=64m -XX:+UseSerialGC -Xss512k -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom
 ENV

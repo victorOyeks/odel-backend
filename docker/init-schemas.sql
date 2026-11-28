@@ -7,3 +7,4 @@ create schema if not exists academic;
 create schema if not exists student;
 create schema if not exists payment;
 create schema if not exists registration;
+create schema if not exists content;
