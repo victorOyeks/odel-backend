@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: payment-service
+  config:
+    import: classpath:odel-common.yml
+  datasource:
+    # One Postgres database; this service owns schema "payment". "app" holds the shared audit log.
+    url: jdbc:postgresql://${ODEL_DB_HOST:localhost}:${ODEL_DB_PORT:5440}/${ODEL_DB_NAME:odel}?currentSchema=payment,app
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    default-schema: payment
+  jpa:
+    properties:
+      hibernate.default_schema: payment
+
+server:
+  port: ${PAYMENT_PORT:9306}
+
+springdoc:
+  api-docs:
+    path: /api-docs/payment
+  swagger-ui:
+    enabled: false   # one Swagger UI for every service, on the api-gateway
+
+odel:
+  payment:
+    # paystack = api.paystack.co with ODEL_PAYSTACK_SECRET_KEY (test or live key); fake = the in-memory stand-in (local, tests).
+    mode: ${ODEL_PAYSTACK_MODE:fake}
+    secret-key: ${ODEL_PAYSTACK_SECRET_KEY:}
+    public-key: ${ODEL_PAYSTACK_PUBLIC_KEY:}
+    base-url: ${ODEL_PAYSTACK_BASE_URL:https://api.paystack.co}
+    default-fee: ${ODEL_PAYMENT_DEFAULT_FEE:15000}
+    default-centre-share: ${ODEL_PAYMENT_CENTRE_SHARE:3000}
+    # Paystack needs an email for every transaction; a student without one pays as <id>@<this domain> (receipts still reach nobody).
+    fallback-email-domain: ${ODEL_PAYMENT_FALLBACK_EMAIL_DOMAIN:students.odel-pay.invalid}
+    recheck-enabled: ${ODEL_PAYMENT_RECHECK:true}
+    office-phone: ${ODEL_OFFICE_PHONE:}
+    seed:
+      slug: ${ODEL_PAYMENT_SEED_SLUG:wesley}
+      bank-code: ${ODEL_PAYSTACK_TEST_BANK_CODE:001}
+      account-number: ${ODEL_PAYSTACK_TEST_ACCOUNT:0000000000}

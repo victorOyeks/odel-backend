@@ -9,8 +9,8 @@ ENV_FILE=$ROOT/.env.dev
 DB_NAME=${DB_NAME:-odel}
 DB_USER=${DB_USER:-odel_user}
 DEPLOY_USER=${DEPLOY_USER:-$USER}
-SERVICES=(api-gateway identity-service tenant-service notification-service academic-service student-service registration-service)
-SCHEMAS=(app identity tenant notification academic student registration)
+SERVICES=(api-gateway identity-service tenant-service notification-service academic-service student-service payment-service registration-service)
+SCHEMAS=(app identity tenant notification academic student payment registration)
 DOMAINS=(odel-dev.oyeksglobal.com odel-console-dev.oyeksglobal.com odel-api-dev.oyeksglobal.com)
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 
@@ -87,6 +87,12 @@ ODEL_MAIL_MODE=log
 
 ODEL_BOOTSTRAP_SUPER_ADMIN_EMAIL=chuka.obi@oyeksglobal.com
 ODEL_BOOTSTRAP_SUPER_ADMIN_NAME=Chuka Obi
+
+# Payments (B2): paystack mode needs the TEST secret key, added by hand (never committed):
+#   ODEL_PAYSTACK_MODE=paystack
+#   ODEL_PAYSTACK_SECRET_KEY=sk_test_...
+# Without them payment-service uses the fake gateway.
+ODEL_PAYSTACK_MODE=fake
 
 JAVA_OPTS=-Xms64m -Xmx320m -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=64m -XX:MaxDirectMemorySize=64m -XX:+UseSerialGC -Xss512k -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom
 ENV

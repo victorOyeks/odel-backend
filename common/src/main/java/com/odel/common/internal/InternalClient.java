@@ -28,7 +28,7 @@ public class InternalClient {
         this.props = props;
     }
 
-    public enum Service { IDENTITY, TENANT, NOTIFICATION, ACADEMIC, STUDENTS }
+    public enum Service { IDENTITY, TENANT, NOTIFICATION, ACADEMIC, STUDENTS, PAYMENTS }
 
     public <T> T get(Service s, String path, Class<T> type) {
         return call(() -> spec(http.get().uri(base(s) + path)).retrieve().body(type));
@@ -80,6 +80,7 @@ public class InternalClient {
             case NOTIFICATION -> props.services().notification();
             case ACADEMIC -> props.services().academic();
             case STUDENTS -> props.services().students();
+            case PAYMENTS -> props.services().payments();
         };
     }
 

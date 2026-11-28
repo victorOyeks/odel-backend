@@ -26,7 +26,7 @@ import org.springframework.web.util.ContentCachingRequestWrapper;
  * Logs request bodies and error-response bodies so a failing call can be understood from the log
  * alone. On with {@code odel.logging.bodies=true} (env {@code ODEL_LOG_BODIES}); meant for dev and
  * staging. Any field whose name looks secret (pass, pin, token, otp, code, secret, card, pan, cvv, authorization,
- * id number, API/auth/private/webhook key; any case, anywhere in the name) is masked, string or number; bodies are cut at 2 KB;
+ * id number, API/auth/private/webhook key, bank account number; any case, anywhere in the name) is masked, string or number; bodies are cut at 2 KB;
  * actuator, swagger, file uploads, webhooks (payment and video providers send card and personal data)
  * are never logged.
  *
@@ -42,7 +42,7 @@ public class BodyLoggingFilter extends OncePerRequestFilter {
     private static final int MAX = 2048;
     /** A JSON key containing a secret-looking fragment, then its string or number value. */
     private static final Pattern SECRETS = Pattern.compile(
-            "(\"[^\"]*(?:pass|pin|token|otp|code|secret|card|pan|cvv|authorization|idnumber|id_number|apikey|api_key|authkey|privatekey|webhookkey)[^\"]*\"\\s*:\\s*)"
+            "(\"[^\"]*(?:pass|pin|token|otp|code|secret|card|pan|cvv|authorization|idnumber|id_number|apikey|api_key|authkey|privatekey|webhookkey|accountnumber|account_number|account_no|nuban)[^\"]*\"\\s*:\\s*)"
                     // Possessive quantifiers: a long value (or one cut short at MAX, with no closing quote) is scanned once, never
                     // backtracked through, so it can't overflow the stack.
                     // A value cut short (no closing quote before the end) is masked too, so no secret's start reaches the log.

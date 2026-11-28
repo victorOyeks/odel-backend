@@ -11,6 +11,7 @@ project, one Spring Boot service per module, one Postgres database (a schema per
 | `notification-service` | 9303 | Email (Brevo), in-app bell, browser push, templates, background job queue |
 | `academic-service` | 9304 | Sessions and semesters, faculties → departments → programmes, course catalogue, study centres and rooms, staffing, versioned grading rules, structure and catalogue CSV imports, the setup checklist (schema `academic`) |
 | `student-service` | 9305 | Student records and history, portal CSV import (row-by-row check, then confirm), welcome emails and delivery report, students list and record, moving a student to another centre (schema `student`) |
+| `payment-service` | 9306 | The platform fee per student per semester: Paystack (hosted checkout, USSD and transfer by the Charge API) behind a `PaymentGateway` interface with a fake for local work, subaccount split (₦12,000 provider / ₦3,000 centre), signed and idempotent webhook, 30-minute re-check, automatic refund of a second payment, reversals, PDF receipts, the university's payments list and the provider's settlement report (schema `payment`) |
 | `registration-service` | 9307 | Course registration per semester: window, compulsory / elective / carry-over courses, unit limits, the fee block (asks payment-service), PDF slip, late registration and course changes decided by the centre coordinator, the registrations report and rules (schema `registration`) |
 | `common` | (library) | Errors, tenancy, sessions and security, audit log, signed file links, internal calls |
 | `e2e-tests` | (tests) | Each build phase's end-to-end journey, run against a running stack |
@@ -63,16 +64,23 @@ The `dev` profile: a typed-email stand-in for Google sign-in, emails logged (`GE
 local disk with signed links, and the provider admin `chuka.obi@odel.dev` created on first start.
 `GET /api/v1/dev/totp?secret=…` gives the current two-step code.
 
+Payments run with the fake gateway locally (`ODEL_PAYSTACK_MODE=fake`, the default): its checkout page is
+`/api/v1/dev/payments/checkout/{reference}` and `POST /api/v1/dev/payments/{reference}/simulate` plays any Paystack outcome with a signed
+webhook. With `ODEL_PAYSTACK_MODE=paystack` and `ODEL_PAYSTACK_SECRET_KEY` (environment only) it talks to api.paystack.co; Paystack's
+webhook URL is `https://<api host>/api/v1/payments/webhooks/paystack`.
+
 Offline Maven (this machine cannot reach Maven Central): `.mvn/maven.config` lets Maven use what is in `~/.m2`; add `-o`.
 
 ## Tests
 
 `mvn verify` runs each module's unit tests. The journeys run through the gateway of a running stack (every service):
 `PlatformBaseJourneyTest` (B0: provider creates a university, its first admin signs in with two-step codes),
-`AcademicSetupJourneyTest` (B1: W-10 set-up, People & roles, audit log), `RegistrationJourneyTest` (B2: course registration,
-slip, late and change requests, coordinator scope, A-07, the centre move; run registration-service with `ODEL_FEE_CHECK=stub` until
-payment-service is merged) and `StudentsInJourneyTest` (B1: import, welcome
-emails, student activation, sign-in and reset, the 3,504-row timing; it builds its programmes and centres through academic-service).
+`AcademicSetupJourneyTest` (B1: W-10 set-up, People & roles, audit log), `StudentsInJourneyTest` (B1: import, welcome
+emails, student activation, sign-in and reset, the 3,504-row timing; it builds its programmes and centres through academic-service),
+`PaymentsJourneyTest` (B2 payments, fake gateway: fee cards, card declined and closed, paid by webhook before and after the browser returns,
+the same webhook twice, transfer confirmed later, USSD and the 30-minute re-check, paid twice and refunded, reversal, reports and the split)
+and `RegistrationJourneyTest` (B2: course registration, slip, late and change requests, coordinator scope, A-07, the centre move; it sets
+each student's fee answer through the dev-only `PUT /api/v1/dev/registration/fee-status`).
 
 ```bash
 ODEL_E2E_GATEWAY=http://localhost:9300 mvn -pl e2e-tests test -Dtest=PlatformBaseJourneyTest
@@ -89,7 +97,7 @@ Never edit a shipped file: add the next numbered one. `common/.../000-app.sql` (
 ## Deploying (dev)
 
 Push `develop`: `.github/workflows/deploy-dev.yml` builds the changed services, copies the jars to the dev VPS and restarts
-them in order (tenant, identity, academic, student, notification, gateway) with a health check and rollback. One-time box set-up:
+them in order (tenant, identity, academic, student, payment, notification, gateway) with a health check and rollback. One-time box set-up:
 `scripts/vps/bootstrap-dev.sh` (database, schemas, `/opt/odel-dev/.env.dev`, systemd units, nginx, certificates).
 
 | What | Where |
@@ -106,5 +114,6 @@ them in order (tenant, identity, academic, student, notification, gateway) with 
 - `docs/api-b0.md`: the API contract for B0.
 - `docs/api-b1-academic.md`: B1 academic setup (sessions, structure, catalogue, centres, staffing, grading, checklist, People & roles, audit log).
 - `docs/api-b1-students.md`: B1 students (import, welcome emails, student activation, sign-in and reset).
+- `docs/api-b2-payments.md`: B2 payments (fees per semester, Paystack, webhook, receipts, reports, settlement accounts).
 - `docs/tech-stack.md`: what each technology is for.
 - Build plan: the "Build plan" tab of the presenter's guide (B0–B12).

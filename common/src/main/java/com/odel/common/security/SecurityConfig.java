@@ -39,7 +39,9 @@ public class SecurityConfig {
         http
             .csrf(c -> c.csrfTokenRepository(csrfRepo)
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers("/api/v1/auth/dev/**", "/api/v1/dev/storage/**", "/internal/**"))
+                    .ignoringRequestMatchers("/api/v1/auth/dev/**", "/api/v1/dev/storage/**", "/internal/**",
+                            // Paystack posts webhooks without a session or CSRF token; the HMAC signature is checked instead (B2).
+                            "/api/v1/payments/webhooks/**", "/api/v1/dev/payments/**"))
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .httpBasic(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
@@ -56,6 +58,8 @@ public class SecurityConfig {
                             "/api/v1/auth/dev/**", "/api/v1/dev/**").permitAll()
                     // Students: activation, sign-in and password reset by matric number and emailed code (B1).
                     .requestMatchers("/api/v1/auth/student/**").permitAll()
+                    // Paystack's webhook (signature required, checked by payment-service) (B2).
+                    .requestMatchers("/api/v1/payments/webhooks/**").permitAll()
                     .requestMatchers("/api/v1/session", "/api/v1/session/**", "/api/v1/auth/mfa/**",
                             "/api/v1/auth/sign-out", "/api/v1/me/active-role").authenticated()
                     .requestMatchers("/api/v1/platform/**").hasAuthority("ROLE_SUPER_ADMIN")

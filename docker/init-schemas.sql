@@ -5,4 +5,5 @@ create schema if not exists tenant;
 create schema if not exists notification;
 create schema if not exists academic;
 create schema if not exists student;
+create schema if not exists payment;
 create schema if not exists registration;
