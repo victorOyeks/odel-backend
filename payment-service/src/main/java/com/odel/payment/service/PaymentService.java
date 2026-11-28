@@ -196,8 +196,7 @@ public class PaymentService {
         p.setCentreShareKobo(centre);
         p.setProviderShareKobo(Money.providerShare(fee.getAmountKobo(), centre));
         p.setSubaccountCode(s.subaccountCode());
-        p.setEmail(st.email() != null && !st.email().isBlank() ? st.email()
-                : "student-" + st.id().toString().substring(0, 8) + "@" + props.fallbackEmailDomain());
+        p.setEmail(payerEmail(st.email(), st.id(), props.fallbackEmailDomain()));
         p.setUssdBank(ussdKey);
         p.setCreatedAt(now);
         p.setUpdatedAt(now);
@@ -305,5 +304,22 @@ public class PaymentService {
             st = null;
         }
         return new Pdf(ReceiptService.fileName(p), receipts.pdf(p, fee, st));
+    }
+
+    private static final java.util.Set<String> RESERVED_TLDS = java.util.Set.of("test", "invalid", "example", "localhost", "local");
+
+    /**
+     * Paystack needs a valid email on every transaction. A student with no email, or one on a reserved test domain (.test,
+     * .invalid, example.com…), pays as student-<id>@<fallback domain>; Paystack refuses the reserved ones outright.
+     */
+    static String payerEmail(String email, UUID studentId, String fallbackDomain) {
+        if (email != null && !email.isBlank() && email.contains("@")) {
+            String host = email.substring(email.lastIndexOf('@') + 1).trim().toLowerCase(java.util.Locale.ROOT);
+            String tld = host.substring(host.lastIndexOf('.') + 1);
+            boolean reserved = RESERVED_TLDS.contains(tld) || host.equals("example.com") || host.equals("example.org") || host.equals("example.net")
+                    || host.endsWith(".example.com");
+            if (!reserved) return email.trim();
+        }
+        return "student-" + studentId.toString().substring(0, 8) + "@" + fallbackDomain;
     }
 }

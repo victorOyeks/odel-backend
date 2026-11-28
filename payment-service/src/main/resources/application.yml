@@ -31,8 +31,9 @@ odel:
     base-url: ${ODEL_PAYSTACK_BASE_URL:https://api.paystack.co}
     default-fee: ${ODEL_PAYMENT_DEFAULT_FEE:15000}
     default-centre-share: ${ODEL_PAYMENT_CENTRE_SHARE:3000}
-    # Paystack needs an email for every transaction; a student without one pays as <id>@<this domain> (receipts still reach nobody).
-    fallback-email-domain: ${ODEL_PAYMENT_FALLBACK_EMAIL_DOMAIN:students.odel-pay.invalid}
+    # Paystack needs a valid email on every transaction; a student without one (or with a reserved test address) pays as
+    # student-<id>@<this domain>. It must be a real domain (Paystack refuses .invalid/.test); the mailbox need not exist.
+    fallback-email-domain: ${ODEL_PAYMENT_FALLBACK_EMAIL_DOMAIN:students.oyeksglobal.com}
     recheck-enabled: ${ODEL_PAYMENT_RECHECK:true}
     office-phone: ${ODEL_OFFICE_PHONE:}
     seed:
