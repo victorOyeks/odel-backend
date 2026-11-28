@@ -69,8 +69,14 @@ public class User {
         return mfaEnabledAt != null && mfaSecretEnc != null;
     }
 
+    /** Titles left out of the initials: "Mrs Bisi Ade" → BA, "Dr Funmi Bello" → FB. */
+    private static final java.util.Set<String> TITLES = java.util.Set.of("mr", "mrs", "ms", "miss", "dr", "prof", "engr", "chief", "rev",
+            "barr", "arc", "pastor", "alhaji", "alhaja", "hajia", "sir", "dame", "pharm");
+
     public String initials() {
-        String[] parts = fullName == null ? new String[0] : fullName.trim().split("\\s+");
+        String[] all = fullName == null ? new String[0] : fullName.trim().split("\\s+");
+        String[] parts = java.util.Arrays.stream(all).filter(w -> !TITLES.contains(w.replace(".", "").toLowerCase(java.util.Locale.ROOT))).toArray(String[]::new);
+        if (parts.length == 0) parts = all;
         if (parts.length == 0 || parts[0].isEmpty()) return "?";
         String first = parts[0].substring(0, 1);
         String last = parts.length > 1 ? parts[parts.length - 1].substring(0, 1) : "";
