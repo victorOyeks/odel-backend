@@ -62,6 +62,11 @@ class StudentsInJourneyTest {
         assertThat(ok.status()).as(ok.body()).isEqualTo(200);
     }
 
+    /** The name the run's Wesley was created with (names are unique on the platform, so each run adds its slug). */
+    String wesleyName() {
+        return "Wesley University (" + wesleySlug + ")";
+    }
+
     String createUniversity(String name, String shortName, String slug, String domain, String admin, String adminEmail, String primary) {
         Map<String, Object> u = new LinkedHashMap<>();
         u.put("name", name + " (" + slug + ")");
@@ -312,7 +317,7 @@ class StudentsInJourneyTest {
         // Test send to herself.
         Browser.Res test = ngoziB.post("/api/v1/students/welcome/test", Map.of());
         assertThat(test.json().get("sentTo").asText()).isEqualTo(ngozi);
-        JsonNode testMail = email(ngozi, "[Test] Welcome to Wesley University ODeL", Set.of(), 30);
+        JsonNode testMail = email(ngozi, "[Test] Welcome to " + wesleyName() + " ODeL", Set.of(), 30);
         assertThat(testMail).isNotNull();
         assertThat(testMail.get("status").asText()).isEqualTo("SENT");
         assertThat(testMail.get("body").asText()).contains("/activate?matric=").doesNotContain("{");
@@ -342,7 +347,7 @@ class StudentsInJourneyTest {
         assertThat(noEmail.at("/items/0/reason").asText()).isEqualTo("No email on record");
         assertThat(ngoziB.get("/api/v1/students/welcome/sends/" + sendId + "/failed.csv").body()).contains("WU/ODL/25/0042").contains("Not sent: no email");
 
-        JsonNode welcome = email(adeolaEmail, "Welcome to Wesley University ODeL", Set.of(), 30);
+        JsonNode welcome = email(adeolaEmail, "Welcome to " + wesleyName() + " ODeL", Set.of(), 30);
         assertThat(welcome.get("body").asText()).startsWith("Hello Adeola,")
                 .contains("B.Sc. Computer Science at Akure Study Centre").contains("Call your study centre on " + AKURE_PHONE).contains(wesleyHost + "/activate?matric=WU%2FODL%2F24%2F0153");
         assertThat(ngoziB.get("/api/v1/students/" + adeolaId).json().get("status").asText()).isEqualTo("INVITED");
@@ -357,7 +362,7 @@ class StudentsInJourneyTest {
     void adeolaActivatesAndReachesHome() throws Exception {
         adeola = student(wesleyHost);
         assertThat(adeola.get("/api/v1/auth/student/password-rules").json().get("minLength").asInt()).isEqualTo(8);
-        assertThat(adeola.get("/api/v1/auth/student/privacy-notice").json().get("intro").asText()).startsWith("Wesley University protects your data");
+        assertThat(adeola.get("/api/v1/auth/student/privacy-notice").json().get("intro").asText()).startsWith(wesleyName() + " protects your data");
 
         long asked = System.currentTimeMillis();
         Browser.Res start = adeola.post("/api/v1/auth/student/activation/start", Map.of("login", " wu/odl/24/0153 "));
@@ -487,7 +492,7 @@ class StudentsInJourneyTest {
 
         // W-22b "Send her a reset code by email": the code and a link to the reset screen.
         assertThat(ngoziB.post("/api/v1/students/" + adeolaId + "/password-reset", Map.of()).status()).isEqualTo(204);
-        JsonNode office = email(adeolaEmail, "Reset your Wesley University password", Set.of(), 30);
+        JsonNode office = email(adeolaEmail, "Reset your " + wesleyName() + " password", Set.of(), 30);
         assertThat(office.get("body").asText()).contains("/reset-password?login=WU%2FODL%2F24%2F0153&sent=1");
         JsonNode reuse = student(wesleyHost).post("/api/v1/auth/student/password-reset/start", Map.of("login", adeolaMatric, "codeAlreadySent", true)).json();
         assertThat(reuse.get("codeSent").asBoolean()).as("the office's code is reused").isFalse();
@@ -505,7 +510,7 @@ class StudentsInJourneyTest {
         assertThat(adeola.get("/api/v1/session").status()).as("signed out at once").isEqualTo(401);
         Browser.Res refused = student(wesleyHost).post("/api/v1/auth/student/sign-in", Map.of("login", adeolaMatric, "password", password));
         assertThat(refused.status()).isEqualTo(403);
-        assertThat(refused.json().get("message").asText()).isEqualTo("Your account is suspended. Please contact the ODeL office at Wesley University to restore access. Your work is safe.");
+        assertThat(refused.json().get("message").asText()).isEqualTo("Your account is suspended. Please contact the ODeL office at " + wesleyName() + " to restore access. Your work is safe.");
         assertThat(student(wesleyHost).post("/api/v1/auth/student/password-reset/start", Map.of("login", adeolaMatric)).status()).isEqualTo(403);
         assertThat(ngoziB.post("/api/v1/students/" + adeolaId + "/suspend", Map.of()).status()).isEqualTo(409);
         assertThat(ngoziB.get("/api/v1/students?status=SUSPENDED").json().get("total").asInt()).isEqualTo(1);
@@ -575,7 +580,7 @@ class StudentsInJourneyTest {
         Browser.Res added = ngoziB.post("/api/v1/students", add);
         assertThat(added.status()).as(added.body()).isEqualTo(201);
         assertThat(added.json().get("status").asText()).isEqualTo("IMPORTED");
-        assertThat(email("grace.eze@" + studentMail, "Welcome to Wesley University ODeL", Set.of(), 30)).as("Add and send welcome").isNotNull();
+        assertThat(email("grace.eze@" + studentMail, "Welcome to " + wesleyName() + " ODeL", Set.of(), 30)).as("Add and send welcome").isNotNull();
         String graceId = added.json().get("id").asText();
         Map<String, Object> noMail = new LinkedHashMap<>(add);
         noMail.put("matricNumber", "WU/ODL/25/0108");
