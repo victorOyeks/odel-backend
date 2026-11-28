@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: registration-service
+  config:
+    import: classpath:odel-common.yml
+  datasource:
+    # One Postgres database; this service owns schema "registration". "app" holds the shared audit log.
+    url: jdbc:postgresql://${ODEL_DB_HOST:localhost}:${ODEL_DB_PORT:5440}/${ODEL_DB_NAME:odel}?currentSchema=registration,app
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    default-schema: registration
+  jpa:
+    properties:
+      hibernate.default_schema: registration
+
+server:
+  port: ${REGISTRATION_PORT:9307}
+
+springdoc:
+  api-docs:
+    path: /api-docs/registration
+  swagger-ui:
+    enabled: false   # one Swagger UI for every service, on the api-gateway
+
+odel:
+  registration:
+    # Is the semester fee paid? http = ask payment-service (GET /internal/payments/fee-status); stub = built-in answer
+    # (fee-stub-default), for running without payment-service.
+    fee-check: ${ODEL_FEE_CHECK:http}
+    fee-stub-default: ${ODEL_FEE_STUB_DEFAULT:PAID}
+    payments-url: ${ODEL_PAYMENTS_URL:http://127.0.0.1:9306}
+    # PUT /api/v1/dev/registration/fee-status: override one student's fee answer (dev profile only).
+    dev-endpoints: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+odel:
+  registration:
+    dev-endpoints: true

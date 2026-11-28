@@ -1,0 +1,22 @@
+[Unit]
+Description=ODeL registration-service (dev)
+After=network.target postgresql.service redis-server.service
+# Enabled on the box, but only runs once CI has shipped a jar for this service.
+ConditionPathExists=/opt/odel-dev/registration-service/app.jar
+
+[Service]
+User=devoyeks
+Group=devoyeks
+WorkingDirectory=/opt/odel-dev/registration-service
+EnvironmentFile=/opt/odel-dev/.env.dev
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/odel-dev/registration-service/app.jar
+SuccessExitStatus=143
+Restart=always
+RestartSec=10
+# Hard cap: heap 320m + metaspace 160m + code cache 64m + direct 64m + thread stacks and GC ≈ 700M.
+MemoryMax=768M
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

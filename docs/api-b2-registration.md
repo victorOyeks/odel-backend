@@ -95,7 +95,7 @@ Checks a choice without saving:
 - `under_min` (R-03b): "That is 13 units, 2 under the minimum of 15. Add an elective."
 - `too_many_electives`: "Choose up to 3 electives. You picked 4."
 - `not_an_elective`: "MTH 101 is not an elective for your programme this semester."
-- `rules_conflict`: "Your compulsory and carry-over courses come to 23 units, over the maximum of 20. The ODeL office has been told; contact your study centre."
+- `rules_conflict`: "Your compulsory and carry-over courses come to 23 units, over the maximum of 20. Contact your study centre: the ODeL office needs to adjust the unit limits."
 
 ### `POST /registration/me/submit` `{"semesterId":null,"electiveIds":["uuid","uuid"],"confirm":true}` (R-04 → R-05b)
 `201` → the registration (section 3). The registration is final: later changes only through a course change request.
