@@ -62,7 +62,8 @@ public class ReceiptService {
         rows.put("Status", Labels.paymentStatus(p.getStatus()));
         String footer = "Check code " + checkCode(p) + ". Paid through Paystack to " + t.name() + ". This receipt is valid without a signature.";
         return ReceiptPdf.render(new ReceiptPdf.Data(t.name(), t.shortName(), t.primaryColor(), peers.crestPng(t),
-                "Platform fee receipt · " + Money.ngn(p.getAmountKobo()), rows, footer));
+                // The heading names what the student paid, as on screen: the total when they also paid Paystack's charge.
+                "Platform fee receipt · " + (charge > 0 ? Money.ngn(p.getChargedKobo()) + " paid" : Money.ngn(p.getAmountKobo())), rows, footer));
     }
 
     public static String fileName(Payment p) {
