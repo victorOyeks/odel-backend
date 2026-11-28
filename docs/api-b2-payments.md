@@ -71,7 +71,9 @@ Starts a payment, or returns the one already open (**one open payment per studen
 Errors: `409 already_paid` "Your fee for 2026/2027 · 1st semester is paid. Your receipt is under Payments." · `409 payment_confirming`
 "We are waiting for your bank to confirm your last payment. Do not pay again." · `409 payments_not_ready` "Payments are not open for your
 university yet. Try again later or call the ODeL office." (no subaccount yet) · `502 gateway_error` "We could not reach the payment
-provider. Nothing was charged. Try again in a minute."
+provider. Nothing was charged. Try again in a minute." (Paystack unreachable) or, when Paystack answered and refused, its reason and
+the other ways to pay: "Paystack could not start this USSD payment (Denied by fraud system). Nothing was charged. Pay by card or bank
+transfer instead, or try again later."
 
 ### Payment
 ```json

@@ -174,9 +174,24 @@ public class PaymentService {
                 return new Started(Views.payment(p, null), true);
             });
         } catch (GatewayException e) {
+            if (e.refused()) {
+                // Paystack answered and said no: name its reason in plain words and point to the other ways to pay.
+                String way = switch (method) {
+                    case CARD -> "card payment";
+                    case USSD -> "USSD payment";
+                    case BANK_TRANSFER -> "bank transfer";
+                };
+                String instead = switch (method) {
+                    case CARD -> "Pay by bank transfer or USSD instead";
+                    case USSD -> "Pay by card or bank transfer instead";
+                    case BANK_TRANSFER -> "Pay by card or USSD instead";
+                };
+                String why = e.getMessage() == null || e.getMessage().isBlank() ? "" : " (" + e.getMessage().replaceAll("[.\\s]+$", "") + ")";
+                throw new ApiException(HttpStatus.BAD_GATEWAY, "gateway_error",
+                        "Paystack could not start this " + way + why + ". Nothing was charged. " + instead + ", or try again later.");
+            }
             throw new ApiException(HttpStatus.BAD_GATEWAY, "gateway_error",
-                    "We could not reach the payment provider. Nothing was charged. Try again in a minute."
-                            + (e.getMessage() == null ? "" : " (Paystack: " + e.getMessage() + ")"));
+                    "We could not reach the payment provider. Nothing was charged. Try again in a minute.");
         }
     }
 

@@ -89,7 +89,7 @@ public class PaystackGateway implements PaymentGateway {
         b.put("ussd", Map.of("type", ussdType));
         JsonNode d = post("/charge", b);
         String code = d.path("ussd_code").asText(null);
-        if (code == null || code.isBlank()) throw new GatewayException(text(d.path("display_text"), "Paystack did not give a USSD code. Try again or pay by card."));
+        if (code == null || code.isBlank()) throw new GatewayException(text(d.path("display_text"), "Paystack did not give a USSD code"), true);
         return new UssdCode(code, d.path("display_text").asText(null));
     }
 
@@ -99,7 +99,7 @@ public class PaystackGateway implements PaymentGateway {
         b.put("bank_transfer", Map.of("account_expires_at", expiresAt.toString()));
         JsonNode d = post("/charge", b);
         String number = d.path("account_number").asText(null);
-        if (number == null) throw new GatewayException(text(d.path("display_text"), "Paystack did not give an account to pay into. Try again or pay by card."));
+        if (number == null) throw new GatewayException(text(d.path("display_text"), "Paystack did not give an account to pay into"), true);
         Instant exp = parseTime(d.path("account_expires_at").asText(null));
         // With the charge passed to the customer, Paystack expects the fee plus its charge (₦15,329.95 for ₦15,000).
         long expected = d.path("amount").asLong(0) > 0 ? d.path("amount").asLong() : charge.amountKobo();
@@ -230,7 +230,7 @@ public class PaystackGateway implements PaymentGateway {
         String top = text(n.path("message"), fallback);
         String why = text(d.path("message"), text(d.path("gateway_response"), text(d.path("display_text"), null)));
         log.warn("Paystack refused: message={} data.status={} reason={}", top, d.path("status").asText(null), why);
-        return new GatewayException(why == null || why.equalsIgnoreCase(top) ? top : top + ": " + why);
+        return new GatewayException(why == null ? top : why, true);
     }
 
     private String message(String body, String fallback) {
