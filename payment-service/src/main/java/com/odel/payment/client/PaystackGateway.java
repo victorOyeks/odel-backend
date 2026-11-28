@@ -199,19 +199,38 @@ public class PaystackGateway implements PaymentGateway {
         try {
             raw = work.get();
         } catch (RestClientResponseException e) {
+            JsonNode n = null;
+            try {
+                n = json.readTree(e.getResponseBodyAsString());
+            } catch (Exception ignored) {
+                // not JSON
+            }
+            if (n != null && n.isObject()) throw refusal(n, "Paystack refused the request (" + e.getStatusCode().value() + ").");
             throw new GatewayException(message(e.getResponseBodyAsString(), "Paystack refused the request (" + e.getStatusCode().value() + ")."));
         } catch (Exception e) {
             throw new GatewayException("We could not reach Paystack. Try again in a minute.", e);
         }
         try {
             JsonNode n = json.readTree(raw);
-            if (!n.path("status").asBoolean(false)) throw new GatewayException(text(n.path("message"), "Paystack refused the request."));
+            if (!n.path("status").asBoolean(false)) throw refusal(n, "Paystack refused the request.");
             return n.path("data");
         } catch (GatewayException e) {
             throw e;
         } catch (Exception e) {
             throw new GatewayException("Paystack sent an answer we could not read.", e);
         }
+    }
+
+    /**
+     * A refusal names Paystack's own reason: the top message ("Charge attempted") is often generic and the reason is in data
+     * (message, gateway_response or display_text). Logged with the data's status so a refused charge can be followed up.
+     */
+    private GatewayException refusal(JsonNode n, String fallback) {
+        JsonNode d = n.path("data");
+        String top = text(n.path("message"), fallback);
+        String why = text(d.path("message"), text(d.path("gateway_response"), text(d.path("display_text"), null)));
+        log.warn("Paystack refused: message={} data.status={} reason={}", top, d.path("status").asText(null), why);
+        return new GatewayException(why == null || why.equalsIgnoreCase(top) ? top : top + ": " + why);
     }
 
     private String message(String body, String fallback) {
