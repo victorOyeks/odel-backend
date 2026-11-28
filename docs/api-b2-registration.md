@@ -138,6 +138,7 @@ already has it). An approved change keeps the number and raises `slipVersion`.
  "history":[{"at","action":"SUBMITTED","summary":"Registered 7 courses, 18 units","by":"Adeola Okafor","slipVersion":1},
             {"at","action":"CHANGE_APPLIED","summary":"Dropped MTH 211, added CSC 211 (approved by Mrs Bisi Ade)","by":"Mrs Bisi Ade","slipVersion":2}]}
 ```
+- `canRequestChange`: course changes are still open (until `changesCloseOn`) and no course change is waiting for a decision.
 - `GET /registration/me/registrations` → `{"items":[<registration without history>]}` (newest first).
 - `GET /registration/me/registrations/{id}` → the registration with `history`.
 

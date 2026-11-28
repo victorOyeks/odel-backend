@@ -441,7 +441,12 @@ public class RegistrationService {
     }
 
     RegistrationView view(Registration r, LocalDate today, boolean history, LocalDate changesCloseOn) {
-        return tx.execute(t -> Views.registration(r, courses.forRegistration(r.getId()), history ? events.forRegistration(r.getId()) : null, changesCloseOn, today));
+        return tx.execute(t -> {
+            // One course change at a time: while one waits for a decision the student is not offered another.
+            boolean changeWaiting = requests.forStudent(r.getStudentId(), r.getSemesterId()).stream()
+                    .anyMatch(q -> q.getKind() == RegistrationRequest.Kind.CHANGE && q.getStatus() == RegistrationRequest.Status.PENDING);
+            return Views.registration(r, courses.forRegistration(r.getId()), history ? events.forRegistration(r.getId()) : null, changesCloseOn, today, changeWaiting);
+        });
     }
 
     static StudentView studentView(StudentRef s) {

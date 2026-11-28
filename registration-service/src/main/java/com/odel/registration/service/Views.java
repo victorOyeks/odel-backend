@@ -37,12 +37,12 @@ public final class Views {
     }
 
     public static RegistrationView registration(Registration r, List<RegistrationCourse> courses, List<RegistrationEvent> events,
-                                                LocalDate changesCloseOn, LocalDate today) {
+                                                LocalDate changesCloseOn, LocalDate today, boolean changeWaiting) {
         List<CourseLine> lines = ordered(courses).stream()
                 .map(c -> new CourseLine(c.getCourseId(), c.getCode(), c.getTitle(), c.getUnits(), c.getKind().name(), kindLabel(c.getKind()))).toList();
         List<HistoryItem> history = events == null ? null : events.stream()
                 .map(e -> new HistoryItem(e.getCreatedAt(), e.getAction(), e.getSummary(), e.getActorName(), e.getSlipVersion())).toList();
-        boolean canChange = changesCloseOn != null && today != null && !today.isAfter(changesCloseOn);
+        boolean canChange = changesCloseOn != null && today != null && !today.isAfter(changesCloseOn) && !changeWaiting;
         return new RegistrationView(r.getId(), semester(r), r.getStatus().name(), r.isLate(), r.getSlipNumber(), r.getSlipVersion(),
                 r.getVerificationCode(), lines, r.getCourseCount(), r.getTotalUnits(), r.getSubmittedAt(), r.getUpdatedAt(), changesCloseOn, canChange,
                 new Ref(r.getCentreId(), r.getCentreCode(), r.getCentreName()), history);
