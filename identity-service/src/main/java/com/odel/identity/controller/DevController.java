@@ -136,6 +136,7 @@ public class DevController {
                     <div class="note"><span aria-hidden="true">ⓘ</span><span>Real Google sign-in with the university's accounts replaces this page before launch.</span></div>
                   </div>
                 </main>
+                <script>addEventListener("pageshow",function(){window.odelSent=false})</script>
                 </body></html>""".formatted(esc(t.name()), brand, accent, esc(initials), portal, esc(state),
                 rows.isEmpty() ? "<div class=\"empty\">No staff accounts yet.</div>" : rows.toString(), esc(domainHint),
                 // The crest is in the page itself (stable, cached address), so it shows with the page.
