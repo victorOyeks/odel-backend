@@ -53,9 +53,9 @@ public class DevController {
     }
 
     @GetMapping(value = "/api/v1/auth/dev/google", produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<String> picker(@RequestParam String state) {
+    public ResponseEntity<String> picker(@RequestParam String state, jakarta.servlet.http.HttpServletRequest request) {
         var st = signIn.peekState(state);
-        if (st.isEmpty()) return AuthController.expiredPage();
+        if (st.isEmpty()) return ResponseEntity.status(HttpStatus.SEE_OTHER).location(startAgain(request)).build();
         TenantInfo t = tenants.get(st.get().tenantId());
         record Person(String name, String email, String role) {}
         List<Person> people = TenantContext.runAs(t.id(), () -> tx.execute(x -> users.findAll().stream()
@@ -154,11 +154,15 @@ public class DevController {
         if (target == null) {
             // The sign-in state was already used (a second click or a resubmitted form) or has expired: send the
             // person back to the sign-in page with "start again" instead of a bare error page (QA ODEL-B0-001).
-            ResolvedHost host = TenantFilter.resolved(request);
-            String signInPage = host != null && host.isUniversity() ? "/staff/sign-in" : "/sign-in";
-            return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create(signInPage + "?error=expired")).build();
+            return ResponseEntity.status(HttpStatus.SEE_OTHER).location(startAgain(request)).build();
         }
         return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create(target)).build();
+    }
+
+    /** The portal's own sign-in page with "start again" (the dev page is served on the portal's host). */
+    private static URI startAgain(jakarta.servlet.http.HttpServletRequest request) {
+        ResolvedHost host = TenantFilter.resolved(request);
+        return URI.create((host != null && host.isUniversity() ? "/staff/sign-in" : "/sign-in") + "?error=expired");
     }
 
     @GetMapping("/api/v1/dev/totp")
