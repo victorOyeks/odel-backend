@@ -32,3 +32,7 @@ odel:
     # service without academic-service.
     academic-lookup: ${ODEL_ACADEMIC_LOOKUP:http}
     welcome-worker: ${ODEL_STUDENT_WELCOME_WORKER:true}
+    # registration-service (B2): a centre move hands the student's open requests to the new centre.
+    registration-url: ${ODEL_REGISTRATION_URL:http://127.0.0.1:9307}
+    # Applies centre moves dated in the future, early on their day (Africa/Lagos).
+    centre-move-cron: ${ODEL_CENTRE_MOVE_CRON:0 5 * * * *}

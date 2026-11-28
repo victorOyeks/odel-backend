@@ -18,9 +18,11 @@ import java.util.UUID;
 @RequestMapping("/api/v1/students")
 public class StudentController {
     private final StudentService students;
+    private final com.odel.student.service.CentreMoveService moves;
 
-    public StudentController(StudentService students) {
+    public StudentController(StudentService students, com.odel.student.service.CentreMoveService moves) {
         this.students = students;
+        this.moves = moves;
     }
 
     @GetMapping
@@ -54,6 +56,26 @@ public class StudentController {
     public StudentDtos.Record update(CurrentUserArg.Holder cu, @PathVariable UUID id, @RequestBody UpdateRequest body) {
         Access.require(cu.user(), Role.ODEL_ADMIN);
         return students.update(cu.user(), id, body);
+    }
+
+    /** A-06 Move to another centre. */
+    @PostMapping("/{id}/move-centre")
+    public com.odel.student.dto.CentreMoveDtos.MoveResult moveCentre(CurrentUserArg.Holder cu, @PathVariable UUID id,
+                                                                    @RequestBody com.odel.student.dto.CentreMoveDtos.MoveRequest body) {
+        Access.require(cu.user(), Role.ODEL_ADMIN);
+        return moves.move(cu.user(), id, body);
+    }
+
+    @GetMapping("/{id}/centre-moves")
+    public com.odel.student.dto.CentreMoveDtos.Moves centreMoves(CurrentUserArg.Holder cu, @PathVariable UUID id) {
+        Access.require(cu.user(), Role.ODEL_ADMIN, Role.ODEL_DIRECTOR);
+        return moves.list(id);
+    }
+
+    @PostMapping("/{id}/centre-moves/{moveId}/cancel")
+    public com.odel.student.dto.CentreMoveDtos.Move cancelMove(CurrentUserArg.Holder cu, @PathVariable UUID id, @PathVariable UUID moveId) {
+        Access.require(cu.user(), Role.ODEL_ADMIN);
+        return moves.cancel(cu.user(), id, moveId);
     }
 
     @PostMapping("/{id}/resend-activation")
