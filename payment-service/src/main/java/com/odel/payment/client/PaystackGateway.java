@@ -11,6 +11,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -71,6 +73,12 @@ public class PaystackGateway implements PaymentGateway {
     public Checkout initialize(Charge charge, String callbackUrl) {
         Map<String, Object> b = base(charge);
         b.put("callback_url", callbackUrl);
+        // Closing the checkout (× → Cancel Payment) goes back to our return page for this payment, which then shows the decline
+        // (P-07) or "You closed the payment page" (P-08); without it Paystack only sends the browser back a page.
+        Map<String, Object> meta = new LinkedHashMap<>(charge.metadata() == null ? Map.of() : charge.metadata());
+        meta.put("cancel_action", callbackUrl + (callbackUrl.contains("?") ? "&" : "?") + "reference="
+                + URLEncoder.encode(charge.reference(), StandardCharsets.UTF_8) + "&closed=1");
+        b.put("metadata", meta);
         JsonNode d = post("/transaction/initialize", b);
         return new Checkout(d.path("authorization_url").asText(), d.path("access_code").asText(null));
     }
