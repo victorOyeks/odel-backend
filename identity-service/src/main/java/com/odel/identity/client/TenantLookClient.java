@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** The university's name, Google domain, colour and portal address for invitations (tenant-service, cached for a minute). */
+/** The university's name, staff email domain and sign-in method, colour and portal address for invitations (tenant-service, cached for a minute). */
 @Component
 public class TenantLookClient {
     private final InternalClient internal;

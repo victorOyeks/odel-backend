@@ -23,6 +23,11 @@ public class TenantInfoClient {
     public TenantInfo get(UUID id) {
         Cached c = cache.get(id);
         if (c != null && System.currentTimeMillis() - c.at() < 60_000) return c.info();
+        return fresh(id);
+    }
+
+    /** Asks tenant-service now (sign-in reads the university's current sign-in method, which the provider may just have changed). */
+    public TenantInfo fresh(UUID id) {
         TenantInfo info = TenantContext.runAs(id, () -> internal.get(InternalClient.Service.TENANT, "/internal/tenants/" + id, TenantInfo.class));
         cache.put(id, new Cached(info, System.currentTimeMillis()));
         return info;

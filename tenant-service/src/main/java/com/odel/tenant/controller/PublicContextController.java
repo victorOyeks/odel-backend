@@ -56,7 +56,13 @@ public class PublicContextController {
     public TenantBranding branding(Tenant t) {
         String logo = logoPath(t);
         return new TenantBranding(t.getId(), t.getSlug(), t.getName(), t.getShortName(), t.getPrimaryColor(),
-                t.getAccentColor(), logo, t.getGoogleDomain(), t.getStatus().name());
+                t.getAccentColor(), logo, t.getStaffEmailDomain(), staffSignIn(t).name(), t.getStaffEmailDomain(), t.getStatus().name());
+    }
+
+    /** The provider console always signs in with Google; a university uses the method the provider chose for it. */
+    public static com.odel.common.security.StaffSignIn staffSignIn(Tenant t) {
+        if (t.isPlatform() || t.getStaffSignIn() == null) return com.odel.common.security.StaffSignIn.GOOGLE;
+        return t.getStaffSignIn();
     }
 
     /**

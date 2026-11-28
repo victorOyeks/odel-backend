@@ -22,6 +22,7 @@ public record OdelProperties(
         Session session,
         Mfa mfa,
         Google google,
+        Microsoft microsoft,
         Storage storage,
         Mail mail,
         Push push,
@@ -37,6 +38,12 @@ public record OdelProperties(
     public record Mfa(String encryptionKey, String issuerSuffix) {}
 
     public record Google(String clientId, String clientSecret, String redirectUri, boolean devStub) {}
+
+    /**
+     * Microsoft 365 (Entra ID) staff sign-in for universities that chose it. authority is the multi-tenant endpoint
+     * (organizations: work and school accounts only). The dev stand-in (odel.google.dev-stub) covers Microsoft too.
+     */
+    public record Microsoft(String clientId, String clientSecret, String redirectUri, String authority) {}
 
     public record Storage(String mode, String localDir, String endpoint, String region, String bucket, String accessKey, String secretKey) {}
 

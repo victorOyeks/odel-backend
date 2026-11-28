@@ -21,13 +21,13 @@ public class StaffMessagesClient {
     /** The invitation (template staff.invitation), e.g. roleLabel "Lecturer for CSC 201 · Computer Science". */
     public void invitation(User u, String roleLabel) {
         TenantLook t = tenants.current();
-        send(u, "staff.invitation", Map.of("fullName", u.getFullName(), "roleLabel", roleLabel, "googleDomain", t.googleDomain(),
-                "signInUrl", signIn(t)), t);
+        send(u, "staff.invitation", Map.of("fullName", u.getFullName(), "roleLabel", roleLabel,
+                "staffEmailDomain", t.staffEmailDomain() == null ? "" : t.staffEmailDomain(), "signInHow", t.signInHow(), "signInUrl", signIn(t)), t);
     }
 
     public void twoStepReset(User u, String resetBy) {
         TenantLook t = tenants.current();
-        send(u, "staff.two_step_reset", Map.of("fullName", u.getFullName(), "resetBy", resetBy, "signInUrl", signIn(t)), t);
+        send(u, "staff.two_step_reset", Map.of("fullName", u.getFullName(), "resetBy", resetBy, "signInHow", t.signInHow(), "signInUrl", signIn(t)), t);
     }
 
     private static String signIn(TenantLook t) {

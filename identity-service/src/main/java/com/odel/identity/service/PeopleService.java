@@ -180,9 +180,9 @@ public class PeopleService {
         String email = in.email() == null ? "" : in.email().trim().toLowerCase(Locale.ROOT);
         if (in.fullName() == null || in.fullName().isBlank()) f.put("fullName", "Type their full name.");
         else if (in.fullName().trim().length() > 200) f.put("fullName", "Keep the name under 200 characters.");
-        if (!email.matches(EMAIL)) f.put("email", "Enter their university email, for example name@" + t.googleDomain() + ".");
-        else if (t.googleDomain() != null && !email.endsWith("@" + t.googleDomain())) {
-            f.put("email", "Use an @" + t.googleDomain() + " address: staff sign in with the university's Google accounts.");
+        if (!email.matches(EMAIL)) f.put("email", "Enter their work email, for example name@" + t.staffEmailDomain() + ".");
+        else if (t.staffEmailDomain() != null && !email.endsWith("@" + t.staffEmailDomain())) {
+            f.put("email", "Use their @" + t.staffEmailDomain() + " work email: staff sign in with an address on the staff email domain.");
         }
         List<Resolved> rs = resolveRoles(in.roles(), f, t.name());
         if (!f.isEmpty()) throw ApiException.fields(HttpStatus.BAD_REQUEST, "invalid", "Some details need fixing.", f);
@@ -268,7 +268,7 @@ public class PeopleService {
             String name = r.get(0), email = r.get(1).toLowerCase(Locale.ROOT);
             if (name.isEmpty()) p.add("Give the person's full name");
             if (!email.matches(EMAIL)) p.add("\"" + r.get(1) + "\" is not an email address");
-            else if (t.googleDomain() != null && !email.endsWith("@" + t.googleDomain())) p.add(email + " is not an @" + t.googleDomain() + " address");
+            else if (t.staffEmailDomain() != null && !email.endsWith("@" + t.staffEmailDomain())) p.add(email + " is not an @" + t.staffEmailDomain() + " address");
             else if (existing.contains(email)) p.add(email + " already has an account here");
             else if (inFile.containsKey(email)) p.add(email + " is also on row " + inFile.get(email));
             else inFile.put(email, r.number());

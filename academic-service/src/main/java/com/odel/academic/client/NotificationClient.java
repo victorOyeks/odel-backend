@@ -28,7 +28,8 @@ public class NotificationClient {
             internal.post(InternalClient.Service.NOTIFICATION, "/internal/messages", Map.of(
                     "userId", s.id(), "email", s.email(), "templateKey", "staff.assigned",
                     "vars", Map.of("fullName", s.fullName(), "what", what, "sessionName", sessionName,
-                            "signInUrl", (t.portalUrl() == null ? "" : t.portalUrl()) + "/staff/sign-in"),
+                            "signInUrl", (t.portalUrl() == null ? "" : t.portalUrl()) + "/staff/sign-in",
+                            "signInHow", t.staffSignInHow() == null ? "Sign in with your work account" : t.staffSignInHow()),
                     "link", "/staff",
                     "tenant", Map.of("name", t.name(), "shortName", t.shortName(), "primaryColor", t.primaryColor())), Map.class);
         } catch (RuntimeException e) {

@@ -89,7 +89,14 @@ odel:
     client-secret: ${ODEL_GOOGLE_CLIENT_SECRET:}
     # One central callback for every university (Google needs each redirect URI registered).
     redirect-uri: ${ODEL_GOOGLE_REDIRECT_URI:http://localhost:3000/api/v1/auth/google/callback}
-    dev-stub: ${ODEL_DEV_SIGN_IN:false}   # the typed-email stand-in for Google; never on production
+    dev-stub: ${ODEL_DEV_SIGN_IN:false}   # the typed-email stand-in for Google (and Microsoft); never on production
+  microsoft:
+    # Universities whose staff use Microsoft 365. Register one multi-tenant app in Microsoft Entra (see docs/api-b0.md).
+    client-id: ${ODEL_MICROSOFT_CLIENT_ID:}
+    client-secret: ${ODEL_MICROSOFT_CLIENT_SECRET:}
+    # One central callback for every university, like Google's.
+    redirect-uri: ${ODEL_MICROSOFT_REDIRECT_URI:http://localhost:3000/api/v1/auth/microsoft/callback}
+    authority: ${ODEL_MICROSOFT_AUTHORITY:https://login.microsoftonline.com/organizations/v2.0}
   storage:
     mode: ${ODEL_STORAGE_MODE:s3}      # s3 (Cloudflare R2) | local (development only)
     local-dir: ${ODEL_STORAGE_LOCAL_DIR:.local-storage}

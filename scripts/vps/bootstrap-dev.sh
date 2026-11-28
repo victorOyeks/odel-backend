@@ -80,6 +80,9 @@ ODEL_SECURE_COOKIES=true
 ODEL_MFA_KEY=$(openssl rand -base64 32)
 ODEL_INTERNAL_API_KEY=$(openssl rand -hex 32)
 ODEL_GOOGLE_REDIRECT_URI=https://odel-console-dev.oyeksglobal.com/api/v1/auth/google/callback
+# Microsoft 365 staff sign-in (universities that chose it): set by hand once the Entra app exists (never committed):
+#   ODEL_MICROSOFT_CLIENT_ID=...  ODEL_MICROSOFT_CLIENT_SECRET=...
+ODEL_MICROSOFT_REDIRECT_URI=https://odel-console-dev.oyeksglobal.com/api/v1/auth/microsoft/callback
 
 ODEL_STORAGE_MODE=local
 ODEL_STORAGE_LOCAL_DIR=$ROOT/storage

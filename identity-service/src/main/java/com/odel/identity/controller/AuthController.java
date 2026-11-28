@@ -25,6 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import com.odel.common.security.StaffSignIn;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -39,15 +40,36 @@ public class AuthController {
 
     @GetMapping("/google/start")
     public ResponseEntity<Void> start(@RequestParam(required = false) String returnTo, HttpServletRequest request) {
-        ResolvedHost host = TenantFilter.resolved(request);
-        if (!host.known()) return ResponseEntity.notFound().build();
-        return redirect(signIn.start(host, returnTo));
+        return start(StaffSignIn.GOOGLE, returnTo, request);
     }
 
     @GetMapping("/google/callback")
     public ResponseEntity<String> callback(@RequestParam(required = false) String state, @RequestParam(required = false) String code,
                                            @RequestParam(required = false) String error) {
-        String target = state == null ? null : signIn.callback(state, code, error);
+        return callback(StaffSignIn.GOOGLE, state, code, error);
+    }
+
+    /** Universities whose staff use Microsoft 365. Browser navigation, like Google's. */
+    @GetMapping("/microsoft/start")
+    public ResponseEntity<Void> microsoftStart(@RequestParam(required = false) String returnTo, HttpServletRequest request) {
+        return start(StaffSignIn.MICROSOFT, returnTo, request);
+    }
+
+    /** Microsoft's central callback (registered once in the platform's Entra app). */
+    @GetMapping("/microsoft/callback")
+    public ResponseEntity<String> microsoftCallback(@RequestParam(required = false) String state, @RequestParam(required = false) String code,
+                                                    @RequestParam(required = false) String error) {
+        return callback(StaffSignIn.MICROSOFT, state, code, error);
+    }
+
+    private ResponseEntity<Void> start(StaffSignIn provider, String returnTo, HttpServletRequest request) {
+        ResolvedHost host = TenantFilter.resolved(request);
+        if (!host.known()) return ResponseEntity.notFound().build();
+        return redirect(signIn.start(host, returnTo, provider));
+    }
+
+    private ResponseEntity<String> callback(StaffSignIn provider, String state, String code, String error) {
+        String target = state == null ? null : signIn.callback(provider, state, code, error);
         if (target == null) return expiredPage();
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(target)).build();
     }
@@ -85,7 +107,7 @@ public class AuthController {
     static ResponseEntity<String> expiredPage() {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.TEXT_HTML)
                 .body("<!doctype html><meta name=viewport content='width=device-width'><title>Sign-in expired</title>"
-                        + "<p style='font-family:sans-serif;padding:24px'>This sign-in link has expired. Go back to your portal and choose "
-                        + "<b>Continue with university Google account</b> again.</p>");
+                        + "<p style='font-family:sans-serif;padding:24px'>This sign-in link has expired. Go back to your portal's staff sign-in page "
+                        + "and start again.</p>");
     }
 }

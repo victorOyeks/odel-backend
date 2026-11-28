@@ -38,7 +38,12 @@ public class Tenant {
     private String webAddressError;
     private Instant webAddressCertAttemptAt;
     private Instant webAddressLiveAt;
-    private String googleDomain;
+    /** Staff sign in with work emails on this domain, e.g. wesleyuni.edu.ng (was "Staff Google domain"; column kept its name). */
+    @Column(name = "google_domain")
+    private String staffEmailDomain;
+    /** How staff prove who they are before the two-step: Google, Microsoft or an emailed code. */
+    @Enumerated(EnumType.STRING)
+    private com.odel.common.security.StaffSignIn staffSignIn = com.odel.common.security.StaffSignIn.GOOGLE;
     @Enumerated(EnumType.STRING)
     private Status status;
     private String primaryColor;

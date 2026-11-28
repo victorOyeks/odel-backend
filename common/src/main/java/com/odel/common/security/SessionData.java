@@ -23,4 +23,6 @@ public class SessionData {
     public Instant createdAt;
     public String ip;
     public String userAgent;
+    /** How the person proved who they are before the two-step: "Google", "Microsoft" or "an emailed code" (for audit lines). */
+    public String firstFactor;
 }

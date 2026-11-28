@@ -1,6 +1,6 @@
 package com.odel.identity.client;
 
-import com.odel.identity.dto.GoogleIdentity;
+import com.odel.identity.dto.SignInIdentity;
 
 import com.odel.common.*;
 import com.odel.common.tenancy.*;
@@ -52,7 +52,7 @@ public class GoogleClient {
     }
 
     @SuppressWarnings("unchecked")
-    public GoogleIdentity exchange(String code, String expectedNonce) {
+    public SignInIdentity exchange(String code, String expectedNonce) {
         var form = new LinkedMultiValueMap<String, String>();
         form.add("code", code);
         form.add("client_id", cfg.clientId());
@@ -66,8 +66,7 @@ public class GoogleClient {
         Jwt jwt = decoder().decode(idToken);
         if (!expectedNonce.equals(jwt.getClaimAsString("nonce"))) throw new IllegalStateException("Nonce mismatch");
         Boolean verified = jwt.getClaim("email_verified");
-        return new GoogleIdentity(jwt.getClaimAsString("email"), Boolean.TRUE.equals(verified),
-                jwt.getClaimAsString("hd"), jwt.getClaimAsString("name"));
+        return new SignInIdentity(jwt.getClaimAsString("email"), Boolean.TRUE.equals(verified), jwt.getClaimAsString("name"));
     }
 
     private NimbusJwtDecoder decoder() {

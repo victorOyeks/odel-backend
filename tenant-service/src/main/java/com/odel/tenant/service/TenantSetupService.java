@@ -13,6 +13,7 @@ import com.odel.common.ApiException;
 import com.odel.common.OdelProperties;
 import com.odel.common.security.Role;
 import com.odel.common.security.ScopeType;
+import com.odel.common.security.StaffSignIn;
 import com.odel.tenant.entity.Tenant;
 import com.odel.common.tenancy.TenantContext;
 import com.odel.tenant.repository.TenantRepository;
@@ -114,7 +115,8 @@ public class TenantSetupService {
         t.setShortName(in.shortName().trim());
         t.setWebAddress(web);
         t.setWebAddressStatus(web == null ? Tenant.WebAddressStatus.NONE : Tenant.WebAddressStatus.WAITING_DNS);
-        t.setGoogleDomain(in.googleDomain().trim().toLowerCase(Locale.ROOT));
+        t.setStaffEmailDomain(in.domain().trim().toLowerCase(Locale.ROOT).replaceFirst("^@", ""));
+        t.setStaffSignIn(StaffSignIn.orGoogle(in.staffSignIn()));
         t.setStatus(Tenant.Status.SETTING_UP);
         t.setPrimaryColor(primary);
         t.setAccentColor(accent);
@@ -139,7 +141,8 @@ public class TenantSetupService {
                 invite(t, admin);
                 tx.executeWithoutResult(st -> audit.record(new AuditService.Entry(t.getId(), actor, "TENANT_CREATED", "tenant", t.getId(),
                         "Created " + t.getName() + "; invited " + admin.fullName(), null,
-                        Map.of("slug", slug, "webAddress", web == null ? "" : web, "firstAdmin", admin.email()))));
+                        Map.of("slug", slug, "webAddress", web == null ? "" : web, "firstAdmin", admin.email(),
+                                "staffEmailDomain", t.getStaffEmailDomain(), "staffSignIn", t.getStaffSignIn().name()))));
                 return t;
             });
         } catch (RuntimeException e) {
@@ -172,6 +175,11 @@ public class TenantSetupService {
             String web = in.webAddress() == null ? null : in.webAddress().trim().toLowerCase(Locale.ROOT);
             if (web != null && !web.isEmpty() && !web.matches(HOST)) fields.put("webAddress", "Enter a web address like odl.wesleyuni.edu.ng, without https://.");
             else if (web != null && !web.isEmpty() && reservedDomain(web)) fields.put("webAddress", RESERVED_MESSAGE);
+            StaffSignIn method = null;
+            if (in.staffSignIn() != null) {
+                method = StaffSignIn.parse(in.staffSignIn()).orElse(null);
+                if (method == null) fields.put("staffSignIn", SIGN_IN_CHOICES);
+            }
             if (web != null && !web.isEmpty() && !web.equals(t.getWebAddress()) && tenants.existsByWebAddressIgnoreCase(web)) {
                 throw new ApiException(HttpStatus.CONFLICT, "web_address_taken", web + " is already used by another university.");
             }
@@ -184,6 +192,15 @@ public class TenantSetupService {
                 t.setWebAddressCertAttemptAt(null);
                 t.setWebAddressLiveAt(null);
             }
+            StaffSignIn was = t.getStaffSignIn() == null ? StaffSignIn.GOOGLE : t.getStaffSignIn();
+            if (method != null && method != was) {
+                // Staff keep their accounts: they are tied to the work email, not to the way it is proved.
+                t.setStaffSignIn(method);
+                audit.record(new AuditService.Entry(t.getId(), actor, "STAFF_SIGN_IN_CHANGED", "tenant", t.getId(),
+                        "Changed " + t.getName() + "'s staff sign-in from " + was.label() + " to " + method.label(),
+                        Map.of("staffSignIn", was.name()), Map.of("staffSignIn", method.name())));
+            }
+            boolean onlySignIn = in.name() == null && in.shortName() == null && in.webAddress() == null && b == null;
             if (in.name() != null) t.setName(in.name().trim());
             if (in.shortName() != null) t.setShortName(in.shortName().trim());
             if (b != null) {
@@ -200,6 +217,7 @@ public class TenantSetupService {
                 if (b.logoKey() != null) t.setLogoKey(b.logoKey().isEmpty() ? null : b.logoKey());
             }
             t.setUpdatedAt(clock.instant());
+            if (onlySignIn) return t;
             audit.record(new AuditService.Entry(t.getId(), actor, "TENANT_UPDATED", "tenant", t.getId(),
                     "Updated " + t.getName() + "'s details and branding", before,
                     Map.of("name", t.getName(), "shortName", t.getShortName(), "primaryColor", t.getPrimaryColor(),
@@ -245,8 +263,10 @@ public class TenantSetupService {
     }
 
     private void invite(Tenant t, Admin admin) {
+        StaffSignIn method = t.getStaffSignIn() == null ? StaffSignIn.GOOGLE : t.getStaffSignIn();
         Map<String, Object> vars = Map.of("fullName", admin.fullName(), "roleLabel", "ODeL admin",
-                "googleDomain", t.getGoogleDomain(), "signInUrl", portalUrl(t) + "/staff/sign-in");
+                "staffEmailDomain", t.getStaffEmailDomain(), "googleDomain", t.getStaffEmailDomain(),
+                "signInHow", method.how(t.getStaffEmailDomain()), "signInUrl", portalUrl(t) + "/staff/sign-in");
         internal.post(InternalClient.Service.NOTIFICATION, "/internal/messages", Map.of(
                 "userId", admin.id(), "email", admin.email(), "templateKey", "staff.invitation", "vars", vars, "link", "/staff",
                 "tenant", Map.of("name", t.getName(), "shortName", t.getShortName(), "primaryColor", t.getPrimaryColor())), Void.class);
@@ -263,8 +283,10 @@ public class TenantSetupService {
         if (!blank(in.webAddress()) && !in.webAddress().trim().toLowerCase(Locale.ROOT).matches(HOST))
             f.put("webAddress", "Enter a web address like odel.wesleyuni.edu.ng, without https://.");
         else if (!blank(in.webAddress()) && reservedDomain(in.webAddress().trim())) f.put("webAddress", RESERVED_MESSAGE);
-        if (blank(in.googleDomain()) || !in.googleDomain().trim().toLowerCase(Locale.ROOT).matches(HOST))
-            f.put("googleDomain", "Enter the staff Google domain, for example wesleyuni.edu.ng.");
+        String domain = blank(in.domain()) ? null : in.domain().trim().toLowerCase(Locale.ROOT).replaceFirst("^@", "");
+        if (domain == null || !domain.matches(HOST))
+            f.put(in.domainField(), "Enter the staff email domain: the part after @ in staff work emails, for example wesleyuni.edu.ng.");
+        if (in.staffSignIn() != null && StaffSignIn.parse(in.staffSignIn()).isEmpty()) f.put("staffSignIn", SIGN_IN_CHOICES);
         Branding b = in.branding();
         if (b == null || !Contrast.isHex(b.primaryColor())) f.put("primaryColor", "Enter a colour like #1A2368.");
         if (b == null || !Contrast.isHex(b.accentColor())) f.put("accentColor", "Enter a colour like #C27808.");
@@ -275,11 +297,13 @@ public class TenantSetupService {
         else if (!hasLetter(a.fullName())) f.put("firstAdmin.fullName", "Enter the first admin's real name, in letters.");
         if (a == null || blank(a.email()) || !a.email().trim().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
             f.put("firstAdmin.email", "Enter the first admin's email.");
-        } else if (!blank(in.googleDomain()) && !a.email().trim().toLowerCase(Locale.ROOT).endsWith("@" + in.googleDomain().trim().toLowerCase(Locale.ROOT))) {
-            f.put("firstAdmin.email", "Use an @" + in.googleDomain().trim().toLowerCase(Locale.ROOT) + " address: staff sign in with the university's Google accounts.");
+        } else if (domain != null && !a.email().trim().toLowerCase(Locale.ROOT).endsWith("@" + domain)) {
+            f.put("firstAdmin.email", "Use their @" + domain + " work email: staff sign in with an address on the staff email domain.");
         }
         return f;
     }
+
+    static final String SIGN_IN_CHOICES = "Choose how staff sign in: Google Workspace, Microsoft 365 or Email code.";
 
     static final String NEEDS_LETTERS = "Use letters: a name cannot be only numbers or symbols.";
 
